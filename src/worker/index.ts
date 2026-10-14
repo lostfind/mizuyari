@@ -64,7 +64,11 @@ app.route("/api", api);
 app.all("/mcp", (c) => c.json({ error: "MCP endpoint is not implemented yet (Phase 2)" }, 501));
 
 // 그 외 경로는 정적 자산(SPA) 으로. run_worker_first 에 걸리지 않는 경로는 여기 오지 않는다.
-app.notFound((c) => c.env.ASSETS.fetch(c.req.raw));
+// ASSETS 응답은 헤더가 immutable 이라 secureHeaders 가 헤더를 붙일 수 있도록 복사해서 돌려준다.
+app.notFound(async (c) => {
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  return new Response(res.body, res);
+});
 
 export default {
   fetch: app.fetch,
