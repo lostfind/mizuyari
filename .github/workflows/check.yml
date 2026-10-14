@@ -1,0 +1,26 @@
+name: Check
+
+# PR 과 main 이외 브랜치 push 에서 타입 검사와 빌드를 돌린다.
+# main 브랜치 ruleset 의 "Require status checks to pass" 에서 이 job(check) 을 지정한다.
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm build

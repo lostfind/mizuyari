@@ -74,7 +74,7 @@ pnpm run deploy
 
 ### GitHub Actions 자동 배포
 
-`.github/workflows/deploy.yml` 이 `main` push 시 마이그레이션과 배포를 실행합니다. 저장소 Secrets 에 다음을 등록하세요.
+`.github/workflows/check.yml` 이 PR 에서 `pnpm check` 와 빌드를 돌리고, `.github/workflows/deploy.yml` 이 `main` push 시 마이그레이션과 배포를 실행합니다. 저장소 Secrets 에 다음을 등록하세요.
 
 - `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit, D1: Edit 권한)
 - `CLOUDFLARE_ACCOUNT_ID`
