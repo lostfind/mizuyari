@@ -16,11 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      # pnpm (packageManager 버전) 과 Node 를 설치하고 lockfile 그대로 pnpm install 까지 한다
+      - uses: pnpm/setup@v3
         with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          runtime: node@22
+          cache: true
+          require-lockfile: true
       - run: pnpm check
       - run: pnpm build
