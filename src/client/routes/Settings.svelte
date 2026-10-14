@@ -56,6 +56,14 @@
 <div class="page narrow">
   <h1>설정</h1>
 
+  {#if session.googleNeedsReauth}
+    <div class="card notice">
+      <strong>Google 권한이 바뀌었습니다.</strong>
+      <span>TODO 완료 처리에 필요한 권한을 받으려면 Google에 다시 연결해 주세요.</span>
+      <a class="btn primary sm" href="/auth/google/start">다시 연결</a>
+    </div>
+  {/if}
+
   <section class="card sec">
     <h2>계정</h2>
     <div class="row" style="justify-content:space-between">
@@ -144,6 +152,16 @@
   }
   .ok {
     color: var(--green);
+  }
+  .notice {
+    padding: 14px 16px;
+    background: #fff8ec;
+    border-color: var(--warn-border);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    color: #6b4a12;
   }
   .err {
     color: #8a1f1f;

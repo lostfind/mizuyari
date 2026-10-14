@@ -32,6 +32,33 @@
     await api.tasks.update(id, { status: "done" });
     await load();
   }
+
+  let completing = $state<Set<number>>(new Set());
+  let todoError = $state("");
+
+  async function completeTodo(id: number) {
+    completing = new Set([...completing, id]);
+    todoError = "";
+    try {
+      await api.todos.complete(id);
+      await load();
+    } catch (e) {
+      todoError = e instanceof Error ? e.message : "완료 처리 실패";
+    } finally {
+      const next = new Set(completing);
+      next.delete(id);
+      completing = next;
+    }
+  }
+
+  function dueLabel(due: string | null): string {
+    if (!due) return "";
+    const d = due.slice(0, 10);
+    if (!data) return ymdShort(d);
+    if (d < data.today) return `${ymdShort(d)} 지남`;
+    if (d === data.today) return "오늘";
+    return ymdShort(d);
+  }
 </script>
 
 <div class="page narrow">
@@ -101,18 +128,41 @@
     </section>
 
     <section class="stack" style="gap:8px">
-      <h2>최근 완료한 TODO</h2>
+      <h2>Google TODO</h2>
+      {#if todoError}<div class="error">{todoError}</div>{/if}
       <div class="card">
-        {#if data.recentTodos.length === 0}
-          <div class="empty">최근 7일간 완료한 Google TODO가 없습니다.</div>
-        {:else}
-          {#each data.recentTodos as a (a.id)}
-            <div class="line">
-              <span class="mono muted w">{md(a.occurredAt)}</span>
-              <span class="done">{a.title.replace(/^TODO 완료 · /, "")}</span>
-            </div>
-          {/each}
+        {#if data.openTodos.length === 0 && data.recentTodos.length === 0}
+          <div class="empty">Google TODO가 없습니다. 동기화 후 표시됩니다.</div>
         {/if}
+        {#each data.openTodos as t (t.id)}
+          {@const busy = completing.has(t.id)}
+          <div class="line todo" class:busy>
+            <input
+              id="todo-{t.id}"
+              type="checkbox"
+              checked={false}
+              disabled={busy}
+              onchange={() => completeTodo(t.id)}
+              aria-label="{t.title} 완료"
+            />
+            <label for="todo-{t.id}" class="todo-body">
+              <span>{t.title}</span>
+              <span class="row small muted">
+                <span>{t.listTitle}</span>
+                {#if t.due}<span class="chip warn">마감 {dueLabel(t.due)}</span>{/if}
+              </span>
+            </label>
+          </div>
+        {/each}
+        {#each data.recentTodos as a (a.id)}
+          <div class="line todo">
+            <input type="checkbox" checked disabled aria-label="완료됨" />
+            <span class="todo-body">
+              <span class="done">{a.title.replace(/^TODO 완료 · /, "")}</span>
+              <span class="small muted">{md(a.occurredAt)} 완료</span>
+            </span>
+          </div>
+        {/each}
       </div>
     </section>
   {/if}
@@ -167,5 +217,30 @@
   .done {
     color: var(--text-3);
     text-decoration: line-through;
+  }
+  .todo {
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .todo.busy {
+    opacity: 0.5;
+  }
+  .todo input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin: 2px 0 0;
+    flex: none;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .todo input[type="checkbox"]:disabled {
+    cursor: default;
+  }
+  .todo-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    cursor: pointer;
   }
 </style>

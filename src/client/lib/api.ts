@@ -2,6 +2,7 @@ import type {
   Activity,
   Epic,
   Goal,
+  GoogleTodo,
   PeriodSummary,
   Report,
   SessionUser,
@@ -57,6 +58,7 @@ export interface TodayData {
   goalSummary: { total: number; achieved: number; inProgress: number } | null;
   tasks: Task[];
   events: Activity[];
+  openTodos: GoogleTodo[];
   recentTodos: Activity[];
 }
 
@@ -69,7 +71,7 @@ export interface PeriodOption {
 }
 
 export const api = {
-  me: () => get<{ user: SessionUser | null; googleConnected?: boolean }>("/auth/me"),
+  me: () => get<{ user: SessionUser | null; googleConnected?: boolean; googleNeedsReauth?: boolean }>("/auth/me"),
   logout: () => post<{ ok: true }>("/auth/logout"),
   config: () =>
     get<{ appName: string; fiscalYearStartMonth: number; reportLang: string; timezone: string; githubLogin: string | null }>("/api/config"),
@@ -140,4 +142,9 @@ export const api = {
     saveSettings: (b: Record<string, string>) => put<Record<string, string>>("/api/sync/settings", b),
   },
   today: () => get<TodayData>("/api/today"),
+  todos: {
+    list: () => get<GoogleTodo[]>("/api/todos"),
+    refresh: () => post<{ count: number }>("/api/todos/refresh"),
+    complete: (id: number) => post<{ ok: true; completedAt: string }>(`/api/todos/${id}/complete`),
+  },
 };

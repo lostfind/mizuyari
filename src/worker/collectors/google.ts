@@ -64,6 +64,67 @@ export async function collectGoogleTasks(accessToken: string, win: CollectWindow
   return out;
 }
 
+export interface OpenTodo {
+  listId: string;
+  listTitle: string;
+  taskId: string;
+  title: string;
+  notes: string | null;
+  due: string | null;
+  webViewLink: string | null;
+  position: string;
+  updated: string;
+}
+
+/** 미완료 TODO 전체 (Today 화면용). */
+export async function fetchOpenGoogleTodos(accessToken: string): Promise<OpenTodo[]> {
+  const lists = await gfetch<{ items?: TaskList[] }>(
+    accessToken,
+    "https://tasks.googleapis.com/tasks/v1/users/@me/lists?maxResults=100",
+  );
+  const out: OpenTodo[] = [];
+  for (const list of lists.items ?? []) {
+    let pageToken: string | undefined;
+    do {
+      const params = new URLSearchParams({ showCompleted: "false", showAssigned: "true", maxResults: "100" });
+      if (pageToken) params.set("pageToken", pageToken);
+      const page = await gfetch<{ items?: Array<GTask & { position?: string }>; nextPageToken?: string }>(
+        accessToken,
+        `https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(list.id)}/tasks?${params}`,
+      );
+      for (const t of page.items ?? []) {
+        if (t.status !== "needsAction" || t.deleted || !t.title?.trim()) continue;
+        out.push({
+          listId: list.id,
+          listTitle: list.title,
+          taskId: t.id,
+          title: t.title.trim(),
+          notes: t.notes ?? null,
+          due: t.due ?? null,
+          webViewLink: t.webViewLink ?? null,
+          position: t.position ?? "",
+          updated: t.updated,
+        });
+      }
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+  }
+  return out;
+}
+
+/** TODO 를 완료 처리한다. Google Tasks 에 하는 유일한 쓰기. 완료 시각을 돌려준다. */
+export async function completeGoogleTodo(accessToken: string, listId: string, taskId: string): Promise<string> {
+  const url = `https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ status: "completed" }),
+  });
+  if (!res.ok) throw new Error(`Google Tasks PATCH ${res.status}: ${await res.text()}`);
+  const t = (await res.json()) as GTask;
+  return t.completed ?? new Date().toISOString();
+}
+
 interface GEvent {
   id: string;
   status: string;

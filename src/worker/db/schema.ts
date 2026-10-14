@@ -169,6 +169,25 @@ export const syncRuns = sqliteTable(
   (t) => [index("sync_runs_provider_idx").on(t.provider, t.startedAt)],
 );
 
+// Google Tasks 의 미완료 TODO 스냅샷. 완료된 것은 activities(google_task) 로 옮겨지고 여기서 지워진다.
+export const googleTodos = sqliteTable(
+  "google_todos",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    listId: text("list_id").notNull(),
+    listTitle: text("list_title").notNull(),
+    taskId: text("task_id").notNull(),
+    title: text("title").notNull(),
+    notes: text("notes"),
+    due: text("due"), // RFC3339 (Google 은 날짜만 의미 있음)
+    webViewLink: text("web_view_link"),
+    position: text("position").notNull().default(""),
+    updated: text("updated").notNull(),
+    syncedAt: text("synced_at").notNull().default(now),
+  },
+  (t) => [uniqueIndex("google_todos_list_task_uq").on(t.listId, t.taskId), index("google_todos_due_idx").on(t.due)],
+);
+
 // 수집 커서 등 소규모 설정값.
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),

@@ -4,6 +4,7 @@ import { api } from "./api";
 class Session {
   user = $state<SessionUser | null>(null);
   googleConnected = $state(false);
+  googleNeedsReauth = $state(false);
   loaded = $state(false);
 
   async load() {
@@ -11,6 +12,7 @@ class Session {
       const r = await api.me();
       this.user = r.user;
       this.googleConnected = r.googleConnected ?? false;
+      this.googleNeedsReauth = r.googleNeedsReauth ?? false;
     } catch {
       this.user = null;
     } finally {

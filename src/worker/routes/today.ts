@@ -37,6 +37,11 @@ todayRoutes.get("/", async (c) => {
     orderBy: [asc(schema.activities.occurredAt)],
   });
 
+  const openTodos = await db.query.googleTodos.findMany({
+    orderBy: [asc(schema.googleTodos.due), asc(schema.googleTodos.listTitle), asc(schema.googleTodos.position)],
+    limit: 50,
+  });
+
   const weekAgo = addDays(today, -7);
   const recentTodos = await db.query.activities.findMany({
     where: and(eq(schema.activities.source, "google_task"), gte(schema.activities.occurredAt, dayRangeToIso(weekAgo, today, tz).from)),
@@ -50,6 +55,7 @@ todayRoutes.get("/", async (c) => {
     goalSummary,
     tasks,
     events: events.map(toActivity),
+    openTodos,
     recentTodos: recentTodos.map(toActivity),
   });
 });

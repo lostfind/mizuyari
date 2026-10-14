@@ -122,6 +122,20 @@ export interface SyncRun {
   updated: number;
 }
 
+export interface GoogleTodo {
+  id: number;
+  listId: string;
+  listTitle: string;
+  taskId: string;
+  title: string;
+  notes: string | null;
+  due: string | null;
+  webViewLink: string | null;
+  position: string;
+  updated: string;
+  syncedAt: string;
+}
+
 export interface SessionUser {
   email: string;
   name: string | null;

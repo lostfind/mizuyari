@@ -90,6 +90,13 @@
   </div>
 </header>
 
+{#if session.googleNeedsReauth && router.route.name !== "settings"}
+  <div class="banner">
+    Google 권한이 바뀌어 TODO 완료 처리가 되지 않습니다.
+    <a href="/auth/google/start">Google 다시 연결</a>
+  </div>
+{/if}
+
 <main>
   {@render children()}
 </main>
@@ -158,6 +165,18 @@
   }
   .btn.icon {
     padding: 0 8px;
+  }
+  .banner {
+    padding: 10px 24px;
+    background: #fff8ec;
+    border-bottom: 1px solid var(--warn-border);
+    color: #6b4a12;
+    font-size: 13px;
+    text-align: center;
+  }
+  .banner a {
+    margin-left: 8px;
+    font-weight: 600;
   }
   .mobile-nav {
     display: none;

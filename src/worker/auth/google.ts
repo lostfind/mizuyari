@@ -18,9 +18,17 @@ export const GOOGLE_SCOPES = [
   "openid",
   "email",
   "profile",
-  "https://www.googleapis.com/auth/tasks.readonly",
+  // Tasks 는 Today 화면에서 TODO 를 완료 처리하기 위해 쓰기 권한이 필요하다 (완료 처리 외의 쓰기는 하지 않는다)
+  "https://www.googleapis.com/auth/tasks",
   "https://www.googleapis.com/auth/calendar.readonly",
 ];
+
+/** 저장된 토큰이 현재 요구 스코프를 모두 갖고 있는지. 부족하면 재로그인(consent) 이 필요하다. */
+export function hasRequiredScopes(grantedScopes: string | null | undefined): boolean {
+  if (!grantedScopes) return false;
+  const granted = new Set(grantedScopes.split(/\s+/));
+  return GOOGLE_SCOPES.filter((s) => s.startsWith("https://")).every((s) => granted.has(s));
+}
 
 const STATE_COOKIE = "mz_oauth";
 
@@ -61,8 +69,8 @@ authRoutes.get("/google/start", async (c) => {
     response_type: "code",
     scope: GOOGLE_SCOPES.join(" "),
     access_type: "offline",
-    // 처음 한 번은 consent 로 refresh_token 을 확실히 받는다. 이미 저장돼 있으면 생략.
-    prompt: (await hasGoogleCredential(createDb(c.env.DB))) ? "select_account" : "consent",
+    // 처음 한 번, 또는 스코프가 늘어난 경우는 consent 로 refresh_token 을 확실히 받는다.
+    prompt: (await hasCurrentGoogleCredential(createDb(c.env.DB))) ? "select_account" : "consent",
     include_granted_scopes: "true",
     state,
     code_challenge: challenge,
@@ -125,12 +133,18 @@ authRoutes.get("/me", async (c) => {
   const user = await readSession(c);
   if (!user) return c.json({ user: null }, 200);
   const db = createDb(c.env.DB);
-  return c.json({ user, googleConnected: await hasGoogleCredential(db) });
+  const cred = await db.query.credentials.findFirst({ where: eq(schema.credentials.provider, "google") });
+  return c.json({
+    user,
+    googleConnected: !!cred,
+    // 스코프가 바뀐 뒤 재로그인이 필요한지 (설정 화면에서 안내)
+    googleNeedsReauth: !!cred && !hasRequiredScopes(cred.scopes),
+  });
 });
 
-async function hasGoogleCredential(db: Db): Promise<boolean> {
+async function hasCurrentGoogleCredential(db: Db): Promise<boolean> {
   const row = await db.query.credentials.findFirst({ where: eq(schema.credentials.provider, "google") });
-  return !!row;
+  return !!row && hasRequiredScopes(row.scopes);
 }
 
 async function saveGoogleTokens(db: Db, env: Env, token: TokenResponse, email: string): Promise<void> {

@@ -15,6 +15,7 @@ import { sprintRoutes } from "./routes/sprints";
 import { syncRoutes } from "./routes/sync";
 import { taskRoutes } from "./routes/tasks";
 import { todayRoutes } from "./routes/today";
+import { todoRoutes } from "./routes/todos";
 
 const app = new Hono<AppContext>();
 
@@ -43,6 +44,7 @@ api.route("/reports", reportRoutes);
 api.route("/periods", periodRoutes);
 api.route("/sync", syncRoutes);
 api.route("/today", todayRoutes);
+api.route("/todos", todoRoutes);
 api.get("/config", (c) =>
   c.json({
     appName: c.env.APP_NAME,

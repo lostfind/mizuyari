@@ -8,7 +8,7 @@ import { schema } from "../db";
 import type { Env } from "../env";
 import { getGoogleAccessToken } from "../auth/google";
 import { collectGithub, fetchGithubStates } from "./github";
-import { collectGoogleCalendar, collectGoogleTasks } from "./google";
+import { collectGoogleCalendar, collectGoogleTasks, fetchOpenGoogleTodos } from "./google";
 import type { CollectWindow, CollectedActivity } from "./types";
 
 const DAY = 86_400_000;
@@ -102,6 +102,27 @@ async function runOne(
   }
 }
 
+/** 미완료 Google TODO 스냅샷을 갱신한다. 더 이상 열려 있지 않은 행은 지운다. */
+export async function refreshOpenTodos(db: Db, accessToken: string): Promise<number> {
+  const open = await fetchOpenGoogleTodos(accessToken);
+  const now = new Date().toISOString();
+  const keep = new Set<string>();
+  for (const t of open) {
+    keep.add(`${t.listId}:${t.taskId}`);
+    await db
+      .insert(schema.googleTodos)
+      .values({ ...t, syncedAt: now })
+      .onConflictDoUpdate({
+        target: [schema.googleTodos.listId, schema.googleTodos.taskId],
+        set: { title: t.title, notes: t.notes, due: t.due, webViewLink: t.webViewLink, position: t.position, updated: t.updated, listTitle: t.listTitle, syncedAt: now },
+      });
+  }
+  const existing = await db.select({ id: schema.googleTodos.id, listId: schema.googleTodos.listId, taskId: schema.googleTodos.taskId }).from(schema.googleTodos);
+  const stale = existing.filter((r) => !keep.has(`${r.listId}:${r.taskId}`)).map((r) => r.id);
+  if (stale.length) await db.delete(schema.googleTodos).where(inArray(schema.googleTodos.id, stale));
+  return open.length;
+}
+
 /** Task 에 연결된 GitHub Issue/PR 상태를 동기화하고, 닫히면 Task 를 done 으로 옮긴다. */
 export async function syncTaskGithubStates(db: Db, env: Env): Promise<number> {
   const rows = await db
@@ -178,7 +199,9 @@ export async function runSync(db: Db, env: Env, opts: SyncOptions = {}): Promise
       results.push(
         await runOne(db, provider, win, async () => {
           const token = await getGoogleAccessToken(db, env);
-          return collectGoogleTasks(token, win);
+          const items = await collectGoogleTasks(token, win);
+          await refreshOpenTodos(db, token);
+          return items;
         }),
       );
     } else if (provider === "google_calendar") {
