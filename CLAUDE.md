@@ -33,7 +33,7 @@ migrations/         Drizzle 가 생성한 D1 마이그레이션
 
 - `pnpm dev` — Vite + Workers 로컬 (D1 로컬 상태 사용, `.dev.vars` 필요)
 - `pnpm check` — Worker tsc + svelte-check
-- `pnpm build` / `pnpm deploy`
+- `pnpm build` / `pnpm run deploy`
 - `pnpm db:generate`, `pnpm db:migrate:local`, `pnpm db:migrate:remote`, `pnpm db:bookmark`
 
 ## 범위 밖 (설계서 참조)

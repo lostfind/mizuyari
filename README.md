@@ -67,7 +67,7 @@ pnpm exec wrangler secret put GITHUB_LOGIN
 
 # 마이그레이션 → 배포
 pnpm db:migrate:remote
-pnpm deploy
+pnpm run deploy
 ```
 
 배포 후 `https://<your-worker>.workers.dev` 로 접속해 Google 로그인을 한 번 하면 Tasks/Calendar 토큰이 저장되고, 이후 매일 00:00 UTC (09:00 JST) 에 자동 수집됩니다. 상단의 "지금 동기화"로 즉시 수집할 수도 있습니다.
