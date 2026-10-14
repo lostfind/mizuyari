@@ -1,0 +1,92 @@
+# Mizuyari (水やり)
+
+GitHub·Google Tasks·Calendar 활동을 자동으로 모아 2주 단위 컨디셔닝 미팅 리포트를 만들고, 분기·반기 평가용으로 쌓아 두는 개인용 웹앱입니다.
+
+- **Sprint**: 2주 목표(Goal)와 수집된 활동을 연결하고 메모·하이라이트를 남긴다
+- **Epics**: 스프린트를 넘어 이어지는 긴 목표. Goal 이 그 아래에 붙는다
+- **Board**: GitHub Project 를 대체하는 칸반. Issue/PR 이 닫히면 자동으로 Done
+- **Report**: 템플릿으로 리포트 초안 생성 → 편집 → 확정 (버전 이력 보관)
+- **Archive**: 10월 시작 회계연도 기준 분기·반기 성과 (1Q = 10–12월)
+- **Today**: 오늘 일정, 진행 중 Task, 최근 완료 TODO
+
+스택: Cloudflare Workers + Hono + D1 + Drizzle, Svelte 5 + Vite. 무료 플랜으로 운영 가능.
+
+## 1. 사전 준비
+
+### Google Cloud (OAuth)
+
+1. [Google Cloud Console](https://console.cloud.google.com/) 에서 프로젝트 생성
+2. **API 및 서비스 → 라이브러리**에서 **Google Tasks API**, **Google Calendar API** 사용 설정
+3. **OAuth 동의 화면**: User Type = External, 게시 상태를 **"프로덕션"으로 변경** (Testing 상태면 refresh token 이 7일 만에 만료됨). 개인용이면 심사 없이 "확인되지 않은 앱" 경고만 넘기면 됨
+4. **사용자 인증 정보 → OAuth 클라이언트 ID** (웹 애플리케이션)
+   - 승인된 리디렉션 URI: `https://<your-worker>.workers.dev/auth/google/callback` 와 로컬용 `http://localhost:5173/auth/google/callback`
+   - client ID / client secret 을 기록
+
+### GitHub
+
+- Fine-grained PAT (권장): 대상 저장소에 **Issues: Read, Pull requests: Read, Metadata: Read**. Organization 승인이 번거로우면 classic PAT 의 `repo` 스코프
+- Organization 이 SAML SSO 를 쓰면 토큰에 SSO 승인 필요
+
+### Cloudflare
+
+- 계정 생성 후 `pnpm exec wrangler login`
+
+## 2. 설치와 로컬 실행
+
+```bash
+pnpm install
+cp .dev.vars.example .dev.vars   # 값 채우기 (ENCRYPTION_KEY: openssl rand -base64 32)
+pnpm db:migrate:local
+pnpm dev                          # http://localhost:5173
+```
+
+로컬에서는 `.dev.vars` 의 `ALLOWED_EMAIL` 계정으로 Google 로그인하면 됩니다.
+
+## 3. 배포
+
+```bash
+# D1 생성 → 출력된 database_id 를 wrangler.jsonc 에 넣는다
+pnpm exec wrangler d1 create mizuyari
+
+# 시크릿 등록
+pnpm exec wrangler secret put ALLOWED_EMAIL
+pnpm exec wrangler secret put SESSION_SECRET        # 긴 랜덤 문자열
+pnpm exec wrangler secret put ENCRYPTION_KEY        # openssl rand -base64 32
+pnpm exec wrangler secret put GOOGLE_CLIENT_ID
+pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
+pnpm exec wrangler secret put GITHUB_TOKEN
+pnpm exec wrangler secret put GITHUB_LOGIN
+
+# 마이그레이션 → 배포
+pnpm db:migrate:remote
+pnpm deploy
+```
+
+배포 후 `https://<your-worker>.workers.dev` 로 접속해 Google 로그인을 한 번 하면 Tasks/Calendar 토큰이 저장되고, 이후 매일 00:00 UTC (09:00 JST) 에 자동 수집됩니다. 상단의 "지금 동기화"로 즉시 수집할 수도 있습니다.
+
+### GitHub Actions 자동 배포
+
+`.github/workflows/deploy.yml` 이 `main` push 시 마이그레이션과 배포를 실행합니다. 저장소 Secrets 에 다음을 등록하세요.
+
+- `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit, D1: Edit 권한)
+- `CLOUDFLARE_ACCOUNT_ID`
+
+## 4. 운영 메모
+
+- **스키마 변경**: `src/worker/db/schema.ts` 수정 → `pnpm db:generate` → 생성된 SQL 확인 → `pnpm db:migrate:remote`. 적용 전 `pnpm db:bookmark` 로 Time Travel 북마크를 기록해 두면 `wrangler d1 time-travel restore mizuyari --bookmark=<id>` 로 되돌릴 수 있습니다.
+- **Google 토큰 오류**(`invalid_grant` 등): 설정 화면의 "Google 다시 연결"로 재로그인.
+- **Calendar 노이즈**: 설정 화면에서 제외 키워드를 지정 (예: 집중, 점심).
+- **MCP 연동**(claude.ai 커스텀 커넥터)은 Phase 2 에서 `/mcp` 에 추가 예정입니다.
+
+## API 요약
+
+| 경로 | 설명 |
+| --- | --- |
+| `GET /api/sprints/current`, `POST /api/sprints`, `POST /api/sprints/:id/next` | 스프린트 조회·생성·다음 스프린트(목표 이월) |
+| `GET/POST/PATCH/DELETE /api/goals`, `/api/epics`, `/api/tasks` | 목표·Epic·Task |
+| `POST /api/tasks/import-github` | 나에게 할당된 Open Issue 를 Task 로 |
+| `GET/POST/PATCH /api/activities` | 활동 조회, 수동 추가, 목표 연결·메모·하이라이트 |
+| `POST /api/reports/sprint/:id/draft`, `POST /api/reports/period/FY2026-1Q/draft` | 리포트 초안 |
+| `PATCH /api/reports/:id`, `POST /api/reports/:id/finalize` | 편집·확정 |
+| `GET /api/periods`, `GET /api/periods/FY2026-H1` | 분기·반기 집계 |
+| `POST /api/sync`, `GET /api/sync/status` | 즉시 수집, 상태 |
