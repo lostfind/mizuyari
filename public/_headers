@@ -1,0 +1,7 @@
+# Workers Static Assets 응답 헤더. Worker 를 거치는 /api, /auth 응답은 src/worker/index.ts 의 secureHeaders 가 담당한다.
+# style-src 'unsafe-inline' 은 Svelte 의 style 속성 때문에 필요하다. 스크립트 인라인은 허용하지 않는다.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin

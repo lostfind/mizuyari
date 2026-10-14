@@ -3,7 +3,7 @@
   import type { Goal, Sprint, Task, TaskStatus } from "$shared/types";
   import { TASK_STATUSES } from "$shared/types";
   import { api } from "../lib/api";
-  import { TASK_STATUS_LABEL, ymdShort } from "../lib/format";
+  import { safeHref, TASK_STATUS_LABEL, ymdShort } from "../lib/format";
 
   let tasks = $state<Task[]>([]);
   let sprints = $state<Sprint[]>([]);
@@ -186,7 +186,7 @@
               <button class="task-title" onclick={() => startEdit(t)}>{t.title}</button>
               <div class="meta">
                 {#if t.githubUrl}
-                  <a class="mono" href={t.githubUrl} target="_blank" rel="noopener">{t.githubUrl.replace(/^https:\/\/github\.com\//, "").replace(/\/(issues|pull)\//, "#")}</a>
+                  <a class="mono" href={safeHref(t.githubUrl)} target="_blank" rel="noopener">{t.githubUrl.replace(/^https:\/\/github\.com\//, "").replace(/\/(issues|pull)\//, "#")}</a>
                   {#if t.githubState && t.githubState !== "open"}<span class="chip src-github">{t.githubState}</span>{/if}
                 {/if}
                 {#if t.goalId && goalById.get(t.goalId)}<span class="chip goal">{goalById.get(t.goalId)!.title}</span>{/if}

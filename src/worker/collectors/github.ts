@@ -178,11 +178,11 @@ export async function fetchGithubStates(
 ): Promise<Map<string, { state: "open" | "closed" | "merged"; title: string }>> {
   const result = new Map<string, { state: "open" | "closed" | "merged"; title: string }>();
   const parsed = urls
-    .map((u) => ({ u, m: /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(issues|pull)\/(\d+)/.exec(u) }))
+    .map((u) => ({ u, m: /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)\/(issues|pull)\/(\d+)/.exec(u) }))
     .filter((x): x is { u: string; m: RegExpExecArray } => !!x.m);
   if (parsed.length === 0) return result;
 
-  // 한 쿼리에 alias 로 묶는다 (최대 50개씩).
+  // 한 쿼리에 alias 로 묶는다 (최대 50개씩). owner/repo 는 위 정규식으로 문자를 제한해 쿼리 문자열에 넣는다.
   for (let i = 0; i < parsed.length; i += 50) {
     const chunk = parsed.slice(i, i + 50);
     const fields = chunk

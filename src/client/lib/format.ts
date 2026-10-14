@@ -74,14 +74,25 @@ export function relTime(iso: string | null): string {
   return `${Math.round(h / 24)}일 전`;
 }
 
-/** 아주 작은 마크다운 렌더러 (제목, 목록, 링크, 굵게, 표). 리포트 미리보기용. */
+/** http(s) URL 만 링크로 쓴다. javascript: 같은 스킴은 null. */
+export function safeHref(url: string | null | undefined): string | null {
+  return url && /^https?:\/\//i.test(url) ? url : null;
+}
+
+/** 아주 작은 마크다운 렌더러 (제목, 목록, 링크, 굵게, 표). 리포트 미리보기용.
+ *  리포트에는 캘린더 일정·PR 제목처럼 외부인이 정한 문자열이 들어가므로 출력은 반드시 이스케이프하고
+ *  링크는 http(s) 만 허용한다. `\[` `\]` `\\` 는 리터럴 문자로 취급한다. */
 export function renderMarkdown(src: string): string {
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const inline = (s: string) =>
     esc(s)
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, t, u) => `<a href="${u}" target="_blank" rel="noopener">${t}</a>`)
+      .replace(/(?<!\\)\[((?:\\.|[^\]\\])+)\]\(([^)\s]+)\)/g, (_m, t, u) =>
+        safeHref(u) ? `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>` : t,
+      )
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>");
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\\([[\]\\])/g, "$1");
 
   const lines = src.split("\n");
   const out: string[] = [];

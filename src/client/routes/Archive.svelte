@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PeriodSummary } from "$shared/types";
   import { api, ApiError, type PeriodOption } from "../lib/api";
-  import { EPIC_STATUS_LABEL, GOAL_STATUS_LABEL, md, relTime, ymdShort } from "../lib/format";
+  import { EPIC_STATUS_LABEL, GOAL_STATUS_LABEL, md, relTime, safeHref, ymdShort } from "../lib/format";
   import { router } from "../lib/router.svelte";
 
   let { period }: { period?: string } = $props();
@@ -135,7 +135,7 @@
             {#each summary.highlights as a (a.id)}
               <li class="row">
                 <span class="mono muted">{md(a.occurredAt)}</span>
-                {#if a.url}<a href={a.url} target="_blank" rel="noopener">{a.title}</a>{:else}<span>{a.title}</span>{/if}
+                {#if a.url}<a href={safeHref(a.url)} target="_blank" rel="noopener">{a.title}</a>{:else}<span>{a.title}</span>{/if}
               </li>
             {/each}
           </ul>

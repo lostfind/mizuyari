@@ -7,7 +7,7 @@ import { upsertActivities } from "../collectors/run";
 import { createDb, schema } from "../db";
 import { isYmd } from "../lib/dates";
 import type { AppContext } from "../lib/session";
-import { HttpError, idParam, parseBody } from "../lib/validate";
+import { HttpError, httpUrl, idParam, parseBody } from "../lib/validate";
 
 const createSchema = z.object({
   title: z.string().trim().min(1).max(300),
@@ -17,7 +17,7 @@ const createSchema = z.object({
   dueDate: z.string().refine(isYmd, "YYYY-MM-DD").nullable().optional(),
   sprintId: z.number().int().positive().nullable().optional(),
   goalId: z.number().int().positive().nullable().optional(),
-  githubUrl: z.string().url().nullable().optional(),
+  githubUrl: httpUrl.nullable().optional(),
   order: z.number().int().optional(),
 });
 

@@ -2,7 +2,7 @@
   import type { Activity, Epic, EpicStatus, Goal, Sprint } from "$shared/types";
   import { EPIC_STATUSES } from "$shared/types";
   import { api } from "../lib/api";
-  import { EPIC_STATUS_LABEL, GOAL_STATUS_LABEL, md, ymdShort } from "../lib/format";
+  import { EPIC_STATUS_LABEL, GOAL_STATUS_LABEL, md, safeHref, ymdShort } from "../lib/format";
   import { router } from "../lib/router.svelte";
 
   let { id }: { id?: number } = $props();
@@ -135,7 +135,7 @@
         {:else}
           <ul class="plain">
             {#each detail.activities as a (a.id)}
-              <li class="row"><span class="mono muted">{md(a.occurredAt)}</span>{#if a.url}<a href={a.url} target="_blank" rel="noopener">{a.title}</a>{:else}<span>{a.title}</span>{/if}</li>
+              <li class="row"><span class="mono muted">{md(a.occurredAt)}</span>{#if a.url}<a href={safeHref(a.url)} target="_blank" rel="noopener">{a.title}</a>{:else}<span>{a.title}</span>{/if}</li>
             {/each}
           </ul>
         {/if}
