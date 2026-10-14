@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "mizuyari",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "5f41759d-f78a-4385-b51a-bd2cc438225e",
       "migrations_dir": "migrations"
     }
   ],
