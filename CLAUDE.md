@@ -15,8 +15,8 @@
 - 날짜: DB 에는 ISO 문자열. 날짜만(YYYY-MM-DD)은 `text`, 시각은 UTC ISO. 기간 계산은 `src/worker/lib/dates.ts`.
 - 활동(activities)은 `(source, external_id)` 로 upsert. 수집기는 제목·URL·시각만 갱신하고 사용자가 붙인 goal/note/highlight 는 건드리지 않는다.
 - 고정 비밀은 Workers Secrets, 런타임에 갱신되는 Google 토큰만 D1 `credentials` 에 AES-GCM 암호화 저장.
-- 외부 API 는 읽기 전용이 원칙. 예외는 Google Tasks 의 TODO 완료 처리(`status=completed` PATCH) 하나뿐이다. GitHub 에는 쓰지 않고, TODO 삭제·수정도 하지 않는다.
-- 미완료 Google TODO 는 `google_todos` 스냅샷에 두고, 완료되면 `activities(google_task)` 로 옮기고 스냅샷에서 지운다.
+- 외부 API 는 읽기 전용이 원칙. 예외는 Google Tasks 의 TODO 완료 상태 변경(`status` PATCH 로 완료 / 완료 취소) 하나뿐이다. GitHub 에는 쓰지 않고, TODO 생성·삭제·내용 수정도 하지 않는다.
+- 미완료 Google TODO 는 `google_todos` 스냅샷에 두고, 완료되면 `activities(google_task)` 로 옮기고 스냅샷에서 지운다. 완료가 취소되면(앱·Google 어느 쪽이든) 반대로 활동을 지우고 스냅샷으로 되돌린다. 같은 TODO 가 양쪽에 동시에 있으면 안 된다.
 - 리포트 출력 언어는 한국어 기본, 요청 시에만 일본어.
 - 스키마를 바꾸면 `pnpm db:generate` 로 마이그레이션 파일을 만들고 SQL 을 확인한다. 컬럼 타입·제약 변경은 테이블 재구성이 필요하니 확장→이행→축소 순서로.
 

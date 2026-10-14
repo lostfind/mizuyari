@@ -7,7 +7,7 @@ GitHub·Google Tasks·Calendar 활동을 자동으로 모아 2주 단위 컨디�
 - **Board**: GitHub Project 를 대체하는 칸반. Issue/PR 이 닫히면 자동으로 Done
 - **Report**: 템플릿으로 리포트 초안 생성 → 편집 → 확정 (버전 이력 보관)
 - **Archive**: 10월 시작 회계연도 기준 분기·반기 성과 (1Q = 10–12월)
-- **Today**: 오늘 일정, 진행 중 Task, 최근 완료 TODO
+- **Today**: 오늘 일정, 진행 중 Task, Google TODO (체크로 완료, 체크 해제로 완료 취소)
 
 스택: Cloudflare Workers + Hono + D1 + Drizzle, Svelte 5 + Vite. 무료 플랜으로 운영 가능.
 
@@ -21,7 +21,7 @@ GitHub·Google Tasks·Calendar 활동을 자동으로 모아 2주 단위 컨디�
 2. **API 및 서비스 → 라이브러리**에서 **Google Tasks API**, **Google Calendar API** 사용 설정
 3. **Google Auth Platform** (구 OAuth 동의 화면) → **시작하기**: 앱 이름, 지원 이메일, 대상은 **외부(External)**, 연락처 입력 후 만들기
 4. **Data Access**: 범위 추가 → `openid`, `userinfo.email`, `userinfo.profile`, `auth/tasks`, `auth/calendar.readonly`
-   - `tasks` 는 Today 화면에서 TODO 를 완료 처리하기 위한 쓰기 권한입니다 (완료 처리 외의 쓰기는 하지 않음)
+   - `tasks` 는 Today 화면에서 TODO 를 완료 / 완료 취소하기 위한 쓰기 권한입니다 (완료 상태 변경 외의 쓰기는 하지 않음)
 5. **Branding**: 앱 홈페이지 `https://github.com/lostfind/mizuyari`, 개인정보처리방침 `https://github.com/lostfind/mizuyari/blob/main/PRIVACY.md` 입력. 승인된 도메인에 `github.com` 추가 (프로덕션 전환에 필요)
 6. **Audience**: **앱 게시**로 프로덕션 전환. 민감한 범위 때문에 "확인 필요" 안내가 나오지만 개인용은 그대로 진행하면 됩니다. 테스트 상태로 두면 refresh token 이 7일 만에 만료되므로 반드시 전환하세요. 로그인 시 "확인되지 않은 앱" 경고는 고급 → 계속으로 넘깁니다
 7. **Clients** → 클라이언트 만들기 → **웹 애플리케이션**
