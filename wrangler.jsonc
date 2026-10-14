@@ -1,0 +1,41 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mizuyari",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/auth/*", "/mcp", "/mcp/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mizuyari",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    // 매일 00:00 UTC (09:00 JST) 자동 수집
+    "crons": ["0 0 * * *"]
+  },
+  "vars": {
+    "APP_NAME": "Mizuyari",
+    "FISCAL_YEAR_START_MONTH": "10",
+    "REPORT_LANG": "ko",
+    "TIMEZONE": "Asia/Tokyo"
+  },
+  "observability": {
+    "enabled": true
+  }
+  // Secrets (wrangler secret put <NAME>):
+  //   ALLOWED_EMAIL          로그인 허용 이메일 1개
+  //   SESSION_SECRET         세션 쿠키 서명 키 (32바이트 이상 랜덤)
+  //   ENCRYPTION_KEY         Credential 암호화 키 (base64, 32바이트)
+  //   GOOGLE_CLIENT_ID       Google OAuth client id
+  //   GOOGLE_CLIENT_SECRET   Google OAuth client secret
+  //   GITHUB_TOKEN           GitHub PAT (읽기 전용)
+  //   GITHUB_LOGIN           GitHub 사용자명 (수집 대상)
+}

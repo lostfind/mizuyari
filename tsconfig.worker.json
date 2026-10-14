@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["@cloudflare/workers-types/2023-07-01"],
+    "paths": {
+      "$shared/*": ["./src/shared/*"]
+    }
+  },
+  "include": ["src/worker/**/*.ts", "src/shared/**/*.ts"]
+}

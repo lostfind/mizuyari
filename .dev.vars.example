@@ -1,0 +1,12 @@
+# 로컬 개발용. 복사해서 .dev.vars 로 저장 (git 제외).
+# 운영은 wrangler secret put <NAME> 으로 등록한다.
+
+ALLOWED_EMAIL=you@example.com
+SESSION_SECRET=change-me-to-a-long-random-string
+# openssl rand -base64 32
+ENCRYPTION_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+# 읽기 전용 PAT (Issues/PR/Contents read). classic이면 repo 스코프.
+GITHUB_TOKEN=
+GITHUB_LOGIN=lostfind
