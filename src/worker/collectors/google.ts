@@ -112,17 +112,32 @@ export async function fetchOpenGoogleTodos(accessToken: string): Promise<OpenTod
   return out;
 }
 
-/** TODO 를 완료 처리한다. Google Tasks 에 하는 유일한 쓰기. 완료 시각을 돌려준다. */
-export async function completeGoogleTodo(accessToken: string, listId: string, taskId: string): Promise<string> {
+/** TODO 의 완료 상태를 바꾼다 (완료 / 완료 취소). Google Tasks 에 하는 유일한 쓰기. 갱신된 TODO 를 돌려준다. */
+export async function setGoogleTodoCompleted(
+  accessToken: string,
+  listId: string,
+  taskId: string,
+  completed: boolean,
+): Promise<GTask & { position?: string }> {
   const url = `https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`;
   const res = await fetch(url, {
     method: "PATCH",
     headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-    body: JSON.stringify({ status: "completed" }),
+    // 완료 취소 시 completed 시각도 함께 지워야 needsAction 으로 돌아간다.
+    body: JSON.stringify(completed ? { status: "completed" } : { status: "needsAction", completed: null }),
   });
   if (!res.ok) throw new Error(`Google Tasks PATCH ${res.status}: ${await res.text()}`);
-  const t = (await res.json()) as GTask;
-  return t.completed ?? new Date().toISOString();
+  return (await res.json()) as GTask & { position?: string };
+}
+
+/** 리스트 제목 조회 (완료 취소로 스냅샷에 되돌릴 때 필요). 없으면 null. */
+export async function fetchGoogleTaskListTitle(accessToken: string, listId: string): Promise<string | null> {
+  const res = await fetch(`https://tasks.googleapis.com/tasks/v1/users/@me/lists/${encodeURIComponent(listId)}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+  const list = (await res.json()) as TaskList;
+  return list.title ?? null;
 }
 
 interface GEvent {

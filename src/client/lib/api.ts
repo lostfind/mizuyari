@@ -146,5 +146,7 @@ export const api = {
     list: () => get<GoogleTodo[]>("/api/todos"),
     refresh: () => post<{ count: number }>("/api/todos/refresh"),
     complete: (id: number) => post<{ ok: true; completedAt: string }>(`/api/todos/${id}/complete`),
+    /** 완료 취소. id 는 완료 활동(google_task) 의 activity id */
+    reopen: (activityId: number) => post<{ ok: true }>(`/api/todos/reopen/${activityId}`),
   },
 };
