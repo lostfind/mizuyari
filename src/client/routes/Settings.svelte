@@ -1,0 +1,151 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { api, type SyncStatus } from "../lib/api";
+  import { relTime, todayYmd } from "../lib/format";
+  import { session } from "../lib/session.svelte";
+
+  let status = $state<SyncStatus[]>([]);
+  let settings = $state<Record<string, string>>({});
+  let excludeKeywords = $state("");
+  let config = $state<{ githubLogin: string | null; timezone: string; fiscalYearStartMonth: number; reportLang: string } | null>(null);
+  let msg = $state("");
+  let busy = $state(false);
+
+  // 재수집
+  let from = $state("");
+  let to = $state(todayYmd());
+
+  const providerLabel = { github: "GitHub", google_tasks: "Google Tasks", google_calendar: "Google Calendar" } as const;
+
+  async function load() {
+    [status, settings, config] = await Promise.all([api.sync.status(), api.sync.settings(), api.config()]);
+    excludeKeywords = settings["calendar:exclude_keywords"] ?? "";
+  }
+
+  onMount(load);
+
+  async function saveSettings() {
+    busy = true;
+    try {
+      settings = await api.sync.saveSettings({ "calendar:exclude_keywords": excludeKeywords });
+      msg = "저장했습니다";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function resync() {
+    if (!from || !to) return;
+    busy = true;
+    msg = "";
+    try {
+      const r = await api.sync.run({ from, to });
+      msg = r.map((x) => `${providerLabel[x.provider]}: ${x.ok ? `+${x.inserted} ~${x.updated}` : `오류 ${x.error}`}`).join(" · ");
+      await load();
+      window.dispatchEvent(new CustomEvent("mz:synced"));
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function logout() {
+    await session.logout();
+  }
+</script>
+
+<div class="page narrow">
+  <h1>설정</h1>
+
+  <section class="card sec">
+    <h2>계정</h2>
+    <div class="row" style="justify-content:space-between">
+      <div class="stack" style="gap:2px">
+        <span>{session.user?.email}</span>
+        <span class="muted small">Google {session.googleConnected ? "연결됨" : "미연결"} · GitHub {config?.githubLogin ?? "미설정"} · {config?.timezone}</span>
+      </div>
+      <div class="row">
+        <a class="btn sm" href="/auth/google/start">Google 다시 연결</a>
+        <button class="btn sm" onclick={logout}>로그아웃</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card sec">
+    <h2>수집 상태</h2>
+    <table class="tbl">
+      <thead><tr><th>출처</th><th>마지막 실행</th><th>결과</th></tr></thead>
+      <tbody>
+        {#each status as s (s.provider)}
+          <tr>
+            <td>{providerLabel[s.provider]}</td>
+            <td class="muted">{relTime(s.at)}</td>
+            <td>{#if s.result === "error"}<span class="err" title={s.error ?? ""}>오류: {s.error?.slice(0, 80)}</span>{:else if s.result}<span class="ok">정상</span>{:else}<span class="muted">아직 없음</span>{/if}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+    <p class="muted small">매일 09:00(JST)에 자동 수집됩니다. 수집 중 오류가 나면 상단 표시줄에 "수집 오류"가 뜹니다.</p>
+  </section>
+
+  <section class="card sec">
+    <h2>기간 지정 재수집</h2>
+    <p class="muted small">놓친 기간이 있거나 과거 활동을 채울 때 씁니다. GitHub는 최대 1년 범위까지 한 번에 조회됩니다.</p>
+    <div class="row">
+      <input type="date" class="input" style="width:auto" bind:value={from} />
+      <span class="muted">–</span>
+      <input type="date" class="input" style="width:auto" bind:value={to} />
+      <button class="btn" onclick={resync} disabled={busy || !from || !to}>재수집</button>
+    </div>
+  </section>
+
+  <section class="card sec">
+    <h2>Calendar 제외 키워드</h2>
+    <p class="muted small">제목에 이 단어가 들어간 일정은 수집하지 않습니다. 쉼표로 구분합니다. (예: 집중, 점심, Focus)</p>
+    <div class="row">
+      <input class="input" style="flex:1" bind:value={excludeKeywords} placeholder="집중, 점심, Focus" />
+      <button class="btn primary" onclick={saveSettings} disabled={busy}>저장</button>
+    </div>
+  </section>
+
+  {#if msg}<div class="muted small">{msg}</div>{/if}
+</div>
+
+<style>
+  .page.narrow {
+    max-width: 760px;
+  }
+  .sec {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sec p {
+    margin: 0;
+  }
+  .small {
+    font-size: 12px;
+  }
+  .tbl {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+  }
+  .tbl th,
+  .tbl td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .tbl th {
+    font-weight: 600;
+    color: var(--text-3);
+    font-size: 12px;
+  }
+  .ok {
+    color: var(--green);
+  }
+  .err {
+    color: #8a1f1f;
+  }
+</style>
