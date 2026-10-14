@@ -9,6 +9,7 @@ import type { Db } from "../db";
 import { createDb, schema } from "../db";
 import { decrypt, encrypt, randomToken, sha256Base64Url } from "../lib/crypto";
 import { type AppContext, clearSession, createSession, readSession } from "../lib/session";
+import { HttpError } from "../lib/validate";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -114,7 +115,7 @@ authRoutes.get("/google/callback", async (c) => {
 
   const infoRes = await fetch(USERINFO_URL, { headers: { authorization: `Bearer ${token.access_token}` } });
   const info = (await infoRes.json()) as { email?: string; name?: string; picture?: string; email_verified?: boolean };
-  if (!info.email || info.email.toLowerCase() !== c.env.ALLOWED_EMAIL.toLowerCase()) {
+  if (!info.email || info.email_verified !== true || info.email.toLowerCase() !== c.env.ALLOWED_EMAIL.toLowerCase()) {
     return c.text("This account is not allowed.", 403);
   }
 
@@ -187,7 +188,10 @@ async function saveGoogleTokens(db: Db, env: Env, token: TokenResponse, email: s
       .set({ encryptedAccessToken: encAccess, accessTokenExpiresAt: expiresAt, scopes: token.scope, updatedAt: now })
       .where(eq(schema.credentials.id, existing.id));
   } else {
-    throw new Error("Google did not return a refresh_token. Revoke the app at myaccount.google.com and sign in again.");
+    throw new HttpError(
+      400,
+      "Google did not return a refresh_token. Revoke the app at myaccount.google.com and sign in again.",
+    );
   }
 }
 

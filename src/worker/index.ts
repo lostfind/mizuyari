@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
 import { authRoutes } from "./auth/google";
 import { runSync } from "./collectors/run";
 import { createDb } from "./db";
@@ -20,13 +21,16 @@ import { todoRoutes } from "./routes/todos";
 const app = new Hono<AppContext>();
 
 app.use("*", logger());
+// API·인증 응답용. 정적 자산(SPA) 의 헤더와 CSP 는 public/_headers 에서 준다.
+app.use("*", secureHeaders());
 
 app.onError((err, c) => {
   if (err instanceof HttpError) {
     return c.json({ error: err.message, details: err.details ?? null }, err.status);
   }
+  // 예상하지 못한 에러는 내부 정보가 담길 수 있으니 로그에만 남기고 응답에는 일반 메시지만 준다.
   console.error(err);
-  return c.json({ error: err instanceof Error ? err.message : "internal error" }, 500);
+  return c.json({ error: "internal error" }, 500);
 });
 
 app.get("/api/health", (c) => c.json({ ok: true, app: c.env.APP_NAME, time: new Date().toISOString() }));

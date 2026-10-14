@@ -102,11 +102,21 @@ function sourceLabel(a: Activity): string {
   }
 }
 
+/** 활동 제목은 외부인이 정할 수 있으므로 마크다운 링크 문법으로 해석되지 않게 이스케이프한다. */
+function mdText(s: string): string {
+  return s.replace(/([\\[\]])/g, "\\$1");
+}
+
+/** 마크다운 링크 대상. 괄호·공백이 링크를 끊지 않도록 인코딩한다. */
+function mdUrl(u: string): string {
+  return u.replace(/[()\s]/g, (ch) => encodeURIComponent(ch));
+}
+
 function activityLine(a: Activity, tz: string): string {
   const ref = a.metadata && typeof a.metadata.number === "number" ? `#${a.metadata.number}` : sourceLabel(a);
-  const link = a.url ? `[${ref}](${a.url})` : ref;
+  const link = a.url ? `[${ref}](${mdUrl(a.url)})` : ref;
   const note = a.note ? ` — ${a.note}` : "";
-  return `- ${a.title}${note} (${link}, ${fmtDate(a.occurredAt, tz)})`;
+  return `- ${mdText(a.title)}${note} (${link}, ${fmtDate(a.occurredAt, tz)})`;
 }
 
 export function renderSprintReport(detail: SprintDetail, lang: Lang, tz: string): string {
@@ -145,7 +155,7 @@ export function renderSprintReport(detail: SprintDetail, lang: Lang, tz: string)
     (x, y) => x.a.occurredAt.localeCompare(y.a.occurredAt),
   );
   for (const { a, goal } of all) {
-    const title = a.url ? `[${a.title}](${a.url})` : a.title;
+    const title = a.url ? `[${mdText(a.title)}](${mdUrl(a.url)})` : mdText(a.title);
     lines.push(`| ${fmtDate(a.occurredAt, tz)} | ${sourceLabel(a)} | ${title.replace(/\|/g, "\\|")} | ${goal} |`);
   }
   return lines.join("\n").trimEnd() + "\n";

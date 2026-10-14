@@ -6,7 +6,7 @@ import { createDb, schema } from "../db";
 import { dayRangeToIso, isYmd } from "../lib/dates";
 import { toActivity } from "../lib/queries";
 import type { AppContext } from "../lib/session";
-import { HttpError, idParam, parseBody } from "../lib/validate";
+import { HttpError, httpUrl, idParam, parseBody } from "../lib/validate";
 import { randomToken } from "../lib/crypto";
 
 export const activityRoutes = new Hono<AppContext>();
@@ -39,7 +39,7 @@ activityRoutes.post("/", async (c) => {
     c,
     z.object({
       title: z.string().trim().min(1).max(500),
-      url: z.string().url().nullable().optional(),
+      url: httpUrl.nullable().optional(),
       occurredAt: z.string().datetime({ offset: true }).optional(),
       goalId: z.number().int().positive().nullable().optional(),
       epicId: z.number().int().positive().nullable().optional(),

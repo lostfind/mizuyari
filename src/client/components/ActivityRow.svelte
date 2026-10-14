@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Activity, Goal } from "$shared/types";
   import { api } from "../lib/api";
-  import { md, sourceGroup, sourceLabel } from "../lib/format";
+  import { md, safeHref, sourceGroup, sourceLabel } from "../lib/format";
 
   let {
     activity,
@@ -47,7 +47,7 @@
   <span class="chip src-{sourceGroup(activity)}">{sourceLabel(activity)}</span>
   <span class="title">
     {#if activity.url}
-      <a href={activity.url} target="_blank" rel="noopener">{activity.title}</a>
+      <a href={safeHref(activity.url)} target="_blank" rel="noopener">{activity.title}</a>
     {:else}
       {activity.title}
     {/if}

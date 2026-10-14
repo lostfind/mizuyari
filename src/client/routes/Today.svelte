@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api, type TodayData } from "../lib/api";
-  import { hm, md, ymdShort } from "../lib/format";
+  import { hm, md, safeHref, ymdShort } from "../lib/format";
   import { router } from "../lib/router.svelte";
 
   let data = $state<TodayData | null>(null);
@@ -118,7 +118,7 @@
               </div>
               <div class="row small">
                 <span class="chip {t.status === 'in_progress' ? 'goal' : 'src-manual'}">{t.status === "in_progress" ? "진행중" : "Todo"}</span>
-                {#if t.githubUrl}<a class="mono" style="color:var(--purple)" href={t.githubUrl} target="_blank" rel="noopener">#{t.githubUrl.split("/").pop()}</a>{/if}
+                {#if t.githubUrl}<a class="mono" style="color:var(--purple)" href={safeHref(t.githubUrl)} target="_blank" rel="noopener">#{t.githubUrl.split("/").pop()}</a>{/if}
                 {#if t.dueDate}<span class="chip warn">마감 {ymdShort(t.dueDate)}</span>{/if}
               </div>
             </div>
