@@ -11,13 +11,13 @@
     "preview": "vite preview",
     "deploy": "pnpm build && wrangler deploy",
     "check": "pnpm check:worker && pnpm check:client",
-    "check:worker": "tsc -p tsconfig.worker.json --noEmit",
+    "check:worker": "pnpm cf-typegen && tsc -p tsconfig.worker.json --noEmit",
     "check:client": "svelte-check --tsconfig ./tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply mizuyari --local",
     "db:migrate:remote": "wrangler d1 migrations apply mizuyari --remote",
     "db:bookmark": "wrangler d1 time-travel info mizuyari",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types --include-env=false"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
@@ -26,7 +26,6 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.64.0",
-    "@cloudflare/workers-types": "^4.20250101.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "drizzle-kit": "^0.31.11",
     "svelte": "^5.57.2",
