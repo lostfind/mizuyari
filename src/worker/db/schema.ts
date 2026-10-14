@@ -170,6 +170,7 @@ export const syncRuns = sqliteTable(
 );
 
 // Google Tasks 의 미완료 TODO 스냅샷. 완료된 것은 activities(google_task) 로 옮겨지고 여기서 지워진다.
+// 완료가 취소되면(앱에서든 Google 에서든) 반대로 활동이 지워지고 여기로 돌아온다.
 export const googleTodos = sqliteTable(
   "google_todos",
   {
