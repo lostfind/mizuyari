@@ -33,23 +33,27 @@
     await load();
   }
 
-  let completing = $state<Set<number>>(new Set());
+  // 처리 중인 항목. 미완료 TODO 는 "todo:<id>", 완료 활동은 "done:<activityId>".
+  let busyKeys = $state<Set<string>>(new Set());
   let todoError = $state("");
 
-  async function completeTodo(id: number) {
-    completing = new Set([...completing, id]);
+  async function withBusy(key: string, fn: () => Promise<unknown>, failMsg: string) {
+    busyKeys = new Set([...busyKeys, key]);
     todoError = "";
     try {
-      await api.todos.complete(id);
+      await fn();
       await load();
     } catch (e) {
-      todoError = e instanceof Error ? e.message : "완료 처리 실패";
+      todoError = e instanceof Error ? e.message : failMsg;
     } finally {
-      const next = new Set(completing);
-      next.delete(id);
-      completing = next;
+      const next = new Set(busyKeys);
+      next.delete(key);
+      busyKeys = next;
     }
   }
+
+  const completeTodo = (id: number) => withBusy(`todo:${id}`, () => api.todos.complete(id), "완료 처리 실패");
+  const reopenTodo = (activityId: number) => withBusy(`done:${activityId}`, () => api.todos.reopen(activityId), "완료 취소 실패");
 
   function dueLabel(due: string | null): string {
     if (!due) return "";
@@ -135,7 +139,7 @@
           <div class="empty">Google TODO가 없습니다. 동기화 후 표시됩니다.</div>
         {/if}
         {#each data.openTodos as t (t.id)}
-          {@const busy = completing.has(t.id)}
+          {@const busy = busyKeys.has(`todo:${t.id}`)}
           <div class="line todo" class:busy>
             <input
               id="todo-{t.id}"
@@ -155,12 +159,22 @@
           </div>
         {/each}
         {#each data.recentTodos as a (a.id)}
-          <div class="line todo">
-            <input type="checkbox" checked disabled aria-label="완료됨" />
-            <span class="todo-body">
-              <span class="done">{a.title.replace(/^TODO 완료 · /, "")}</span>
+          {@const busy = busyKeys.has(`done:${a.id}`)}
+          {@const title = a.title.replace(/^TODO 완료 · /, "")}
+          <div class="line todo" class:busy>
+            <input
+              id="done-{a.id}"
+              type="checkbox"
+              checked={true}
+              disabled={busy}
+              onchange={() => reopenTodo(a.id)}
+              aria-label="{title} 완료 취소"
+              title="체크를 해제하면 Google TODO 에서도 미완료로 돌아갑니다"
+            />
+            <label for="done-{a.id}" class="todo-body">
+              <span class="done">{title}</span>
               <span class="small muted">{md(a.occurredAt)} 완료</span>
-            </span>
+            </label>
           </div>
         {/each}
       </div>

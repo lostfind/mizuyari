@@ -105,8 +105,13 @@ async function runOne(
   }
 }
 
-/** 미완료 Google TODO 스냅샷을 갱신한다. 더 이상 열려 있지 않은 행은 지운다. */
-export async function refreshOpenTodos(db: Db, accessToken: string): Promise<number> {
+/**
+ * 미완료 Google TODO 스냅샷을 갱신한다. 더 이상 열려 있지 않은 행은 지운다.
+ * Google 쪽에서 완료를 취소한 TODO 는 다시 미완료가 되므로, 남아 있는 완료 활동(google_task)을 지워
+ * 같은 TODO 가 완료 이력과 미완료로 둘 다 보이지 않게 한다.
+ * 돌려주는 값: 현재 열려 있는 TODO 의 `listId:taskId` 집합.
+ */
+export async function refreshOpenTodos(db: Db, accessToken: string): Promise<Set<string>> {
   const open = await fetchOpenGoogleTodos(accessToken);
   const now = new Date().toISOString();
   const keep = new Set<string>();
@@ -123,7 +128,24 @@ export async function refreshOpenTodos(db: Db, accessToken: string): Promise<num
   const existing = await db.select({ id: schema.googleTodos.id, listId: schema.googleTodos.listId, taskId: schema.googleTodos.taskId }).from(schema.googleTodos);
   const stale = existing.filter((r) => !keep.has(`${r.listId}:${r.taskId}`)).map((r) => r.id);
   if (stale.length) await db.delete(schema.googleTodos).where(inArray(schema.googleTodos.id, stale));
-  return open.length;
+  await deleteReopenedTodoActivities(db, keep);
+  return keep;
+}
+
+/** 열려 있는 TODO 와 같은 external_id 를 가진 완료 활동을 지운다 (Google 에서 완료 취소된 경우). */
+export async function deleteReopenedTodoActivities(db: Db, openKeys: Set<string>): Promise<number> {
+  if (openKeys.size === 0) return 0;
+  const keys = [...openKeys];
+  let deleted = 0;
+  // SQLite 바인딩 한도를 피하려고 나눠서 지운다.
+  for (let i = 0; i < keys.length; i += 50) {
+    const r = await db
+      .delete(schema.activities)
+      .where(and(eq(schema.activities.source, "google_task"), inArray(schema.activities.externalId, keys.slice(i, i + 50))))
+      .returning({ id: schema.activities.id });
+    deleted += r.length;
+  }
+  return deleted;
 }
 
 /** Task 에 연결된 GitHub Issue/PR 상태를 동기화하고, 닫히면 Task 를 done 으로 옮긴다. */
@@ -203,8 +225,9 @@ export async function runSync(db: Db, env: Env, opts: SyncOptions = {}): Promise
         await runOne(db, provider, win, async () => {
           const token = await getGoogleAccessToken(db, env);
           const items = await collectGoogleTasks(token, win);
-          await refreshOpenTodos(db, token);
-          return items;
+          const open = await refreshOpenTodos(db, token);
+          // 완료 후 다시 열린 TODO 는 완료 활동으로 남기지 않는다.
+          return items.filter((a) => !open.has(a.externalId));
         }),
       );
     } else if (provider === "google_calendar") {
