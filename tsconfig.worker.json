@@ -10,7 +10,7 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["@cloudflare/workers-types/2023-07-01"],
+    "types": ["./worker-configuration.d.ts"],
     "paths": {
       "$shared/*": ["./src/shared/*"]
     }

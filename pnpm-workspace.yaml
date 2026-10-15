@@ -1,0 +1,5 @@
+# pnpm 12 는 승인되지 않은 의존성의 build 스크립트를 막고 install 을 실패시킨다 (strictDepBuilds).
+# esbuild 와 workerd 는 postinstall 로 플랫폼 바이너리를 받아야 동작한다.
+allowBuilds:
+  esbuild: true
+  workerd: true
