@@ -81,10 +81,10 @@
   </button>
   {#if showGoal}
     {#if taskLinked}
-      <span class="chip goal" class:none={!goalLabel} title="Board 의 Task 목표를 따릅니다. 바꾸려면 Board 에서 수정하세요.">{goalLabel ?? "목표 없음"}</span>
+      <span class="chip goal goal-ctl" class:none={!goalLabel} title="Board 의 Task 목표를 따릅니다. 바꾸려면 Board 에서 수정하세요.">{goalLabel ?? "목표 없음"}</span>
     {:else if goals.length}
       <select
-        class="select goal-select"
+        class="select goal-select goal-ctl"
         class:linked={!!activity.goalId}
         value={activity.goalId ?? ""}
         onchange={(e) => update({ goalId: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
@@ -173,8 +173,22 @@
   .act.hidden .chip {
     opacity: 0.55;
   }
+  /* 목표 선택과 (Board 연결 활동의) 목표 칩을 같은 폭으로 둬서 앞의 버튼 위치가 행마다 같게 한다. */
+  .goal-ctl {
+    width: 160px;
+    flex: 0 0 160px;
+    min-height: 32px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chip.goal-ctl {
+    display: block;
+    padding: 6px 9px;
+    line-height: 18px;
+    border: 1px solid var(--accent-tint);
+  }
   .goal-select {
-    width: auto;
     min-height: 32px;
     padding: 4px 8px;
     font-size: 12px;
@@ -191,7 +205,9 @@
   }
   .chip.goal.none {
     color: var(--text-3);
+    background: transparent;
     border-style: dashed;
+    border-color: var(--border);
   }
   .note-edit {
     flex: 1 1 100%;
