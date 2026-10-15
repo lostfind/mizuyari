@@ -1,0 +1,1 @@
+CREATE INDEX `activities_task_idx` ON `activities` (`task_id`);

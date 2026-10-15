@@ -1,6 +1,6 @@
 // 여러 라우트가 함께 쓰는 조회 로직.
 
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import type { Activity, Goal, GoalStatus, GoalWithActivities, Sprint, SprintDetail } from "$shared/types";
 import type { Db } from "../db";
 import { schema } from "../db";
@@ -58,8 +58,12 @@ export async function getSprintDetail(db: Db, sprintId: number, tz: string): Pro
     activities: linked.filter((a) => a.goalId === g.id).map(toActivity),
   }));
 
+  // 스프린트의 Task 에 더해, 활동이 가리키는 Task 도 포함한다 (화면에서 「Task: 제목」 표시용).
+  const referencedTaskIds = [...new Set([...linked, ...unlinked].map((a) => a.taskId).filter((x): x is number => x !== null))];
   const tasks = await db.query.tasks.findMany({
-    where: eq(schema.tasks.sprintId, sprintId),
+    where: referencedTaskIds.length
+      ? or(eq(schema.tasks.sprintId, sprintId), inArray(schema.tasks.id, referencedTaskIds))
+      : eq(schema.tasks.sprintId, sprintId),
     orderBy: [asc(schema.tasks.order), asc(schema.tasks.id)],
   });
 

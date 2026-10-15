@@ -106,6 +106,7 @@ export const activities = sqliteTable(
     index("activities_occurred_idx").on(t.occurredAt),
     index("activities_goal_idx").on(t.goalId),
     index("activities_epic_idx").on(t.epicId),
+    index("activities_task_idx").on(t.taskId),
   ],
 );
 

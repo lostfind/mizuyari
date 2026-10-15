@@ -81,7 +81,7 @@ pnpm run deploy
 
 ## 4. 운영 메모
 
-- **스키마 변경**: `src/worker/db/schema.ts` 수정 → `pnpm db:generate` → 생성된 SQL 확인 → `pnpm db:migrate:remote`. 적용 전 `pnpm db:bookmark` 로 Time Travel 북마크를 기록해 두면 `wrangler d1 time-travel restore mizuyari --bookmark=<id>` 로 되돌릴 수 있습니다.
+- **스키마 변경**: `src/worker/db/schema.ts` 수정 → `pnpm db:generate` → 생성된 SQL 확인 → `pnpm db:migrate:remote`. 적용 전 `pnpm db:bookmark` 로 Time Travel 북마크를 기록해 두면 `wrangler d1 time-travel restore mizuyari --bookmark=<id>` 로 되돌릴 수 있습니다. 테이블 관계는 [docs/ERD.md](docs/ERD.md) 를 참조하고, 스키마를 바꾸면 함께 갱신합니다.
 - **Google 토큰 오류**(`invalid_grant` 등): 설정 화면의 "Google 다시 연결"로 재로그인.
 - **Calendar 노이즈**: 설정 화면에서 제외 키워드를 지정 (예: 집중, 점심).
 - **MCP 연동**(claude.ai 커스텀 커넥터)은 Phase 2 에서 `/mcp` 에 추가 예정입니다.
