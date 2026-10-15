@@ -55,6 +55,30 @@ query($login: String!, $from: DateTime!, $to: DateTime!) {
   }
 }`;
 
+// issueContributions 는 본인이 「연」 Issue 만 돌려준다. 남이 열어 본인에게 할당된 Issue 나 기간 전에 연 Issue 를
+// 닫은 것은 기여로 잡히지 않으므로, 기간 안에 닫힌 본인 할당·작성 Issue 를 검색으로 따로 모은다.
+const CLOSED_ISSUES_QUERY = `
+query($assigned: String!, $authored: String!) {
+  assigned: search(type: ISSUE, query: $assigned, first: 100) { nodes { ...ClosedIssue } }
+  authored: search(type: ISSUE, query: $authored, first: 100) { nodes { ...ClosedIssue } }
+}
+fragment ClosedIssue on Issue { id number title url state closedAt repository { nameWithOwner } }`;
+
+interface ClosedIssueNode {
+  id?: string;
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  closedAt: string | null;
+  repository: { nameWithOwner: string };
+}
+
+interface ClosedIssuesData {
+  assigned: { nodes: ClosedIssueNode[] };
+  authored: { nodes: ClosedIssueNode[] };
+}
+
 interface ContributionsData {
   user: {
     contributionsCollection: {
@@ -115,6 +139,7 @@ export async function collectGithub(
   const data = await gql<ContributionsData>(token, CONTRIBUTIONS_QUERY, { login, from: win.from, to: win.to });
   if (!data.user) throw new Error(`GitHub user not found: ${login}`);
   const cc = data.user.contributionsCollection;
+  // 제목은 「원래 제목 (repo#번호)」. 종류와 상태(closed / merged)는 화면·리포트의 라벨이 보여 준다.
   const out: CollectedActivity[] = [];
 
   for (const n of cc.issueContributions.nodes) {
@@ -123,7 +148,7 @@ export async function collectGithub(
     out.push({
       source: "github_issue",
       externalId: i.id,
-      title: `${closed ? "Issue closed" : "Issue opened"} · ${i.repository.nameWithOwner}#${i.number} ${i.title}`,
+      title: `${i.title} (${i.repository.nameWithOwner}#${i.number})`,
       url: i.url,
       // 닫힌 Issue 는 닫힌 시각을 활동 시각으로 쓴다 (성과 기준).
       occurredAt: closed && i.closedAt ? i.closedAt : n.occurredAt,
@@ -133,11 +158,10 @@ export async function collectGithub(
 
   for (const n of cc.pullRequestContributions.nodes) {
     const p = n.pullRequest;
-    const label = p.merged ? "PR merged" : p.state === "CLOSED" ? "PR closed" : "PR opened";
     out.push({
       source: "github_pr",
       externalId: p.id,
-      title: `${label} · ${p.repository.nameWithOwner}#${p.number} ${p.title}`,
+      title: `${p.title} (${p.repository.nameWithOwner}#${p.number})`,
       url: p.url,
       occurredAt: p.merged && p.mergedAt ? p.mergedAt : n.occurredAt,
       metadata: {
@@ -155,7 +179,7 @@ export async function collectGithub(
     out.push({
       source: "github_review",
       externalId: n.pullRequestReview.id,
-      title: `Reviewed · ${p.repository.nameWithOwner}#${p.number} ${p.title}`,
+      title: `${p.title} (${p.repository.nameWithOwner}#${p.number})`,
       url: p.url,
       occurredAt: n.occurredAt,
       metadata: {
@@ -166,6 +190,32 @@ export async function collectGithub(
         kind: "review",
       },
     });
+  }
+
+  // 기간 안에 닫힌 본인 할당·작성 Issue. 같은 Issue 가 위 issueContributions 에 있으면 이쪽(닫힌 시각 기준)으로 덮는다.
+  const closedRange = `closed:${win.from}..${win.to}`;
+  const closed = await gql<ClosedIssuesData>(token, CLOSED_ISSUES_QUERY, {
+    assigned: `is:issue assignee:${login} ${closedRange}`,
+    authored: `is:issue author:${login} ${closedRange}`,
+  });
+  const byId = new Map(out.map((a, i) => [a.externalId, i]));
+  for (const i of [...closed.assigned.nodes, ...closed.authored.nodes]) {
+    if (!i.id || !i.closedAt) continue;
+    const item: CollectedActivity = {
+      source: "github_issue",
+      externalId: i.id,
+      title: `${i.title} (${i.repository.nameWithOwner}#${i.number})`,
+      url: i.url,
+      occurredAt: i.closedAt,
+      metadata: { repo: i.repository.nameWithOwner, number: i.number, state: i.state, kind: "issue" },
+    };
+    const at = byId.get(i.id);
+    if (at === undefined) {
+      byId.set(i.id, out.length);
+      out.push(item);
+    } else {
+      out[at] = item;
+    }
   }
 
   return out;
