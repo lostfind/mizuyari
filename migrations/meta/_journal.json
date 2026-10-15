@@ -15,6 +15,13 @@
       "when": 1791979451628,
       "tag": "0001_google_todos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792023897999,
+      "tag": "0002_normalize_occurred_at",
+      "breakpoints": true
     }
   ]
 }
