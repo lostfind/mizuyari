@@ -175,5 +175,5 @@ erDiagram
 - **Task 완료 기록**: `github_url` 이 없는 Task 만 done 이 될 때 `activities(source = task_status, external_id = "<task_id>:done")` 를 남긴다. GitHub 연결 Task 는 수집된 Issue closed / PR merged 활동이 완료 기록을 대신한다.
 - **스프린트 이월과 Task**: Task 는 이월 때 복사되지 않는다. Board 에서 Task 의 목표를 다음 스프린트 목표로 옮기면 그 Task 의 활동 전부가 새 목표로 이동하므로, 이전 스프린트 리포트는 확정한 뒤에 옮기는 것을 전제로 한다. 확정된 리포트 markdown 은 영향을 받지 않는다.
 - **Google TODO 이동**: 미완료 TODO 는 `google_todos` 에만 있고, 완료되면 `activities(source = google_task)` 로 옮겨지며 스냅샷에서 지워진다. 완료 취소 시 반대로 되돌린다. 같은 TODO 가 두 테이블에 동시에 있으면 안 된다.
-- **settings 키**: `sync:<provider>:last_success` (수집 커서), `calendar:exclude_keywords`, `calendar:palette`, `calendar:color_labels`, `migrate:task_link_v1` (중복 `task_status` 정리를 한 번만 돌린 표시).
+- **settings 키**: `sync:<provider>:last_success` (수집 커서), `calendar:exclude_keywords`, `calendar:palette`, `calendar:color_labels`, `migrate:task_link_v1` (중복 `task_status` 정리를 한 번만 돌린 표시), `migrate:github_closed_issues_v1` (닫힌 할당 Issue 30일 백필을 한 번만 돌린 표시).
 - **credentials** 는 현재 `provider = "google"` 한 행만 쓴다. `ENCRYPTION_KEY` 를 바꾸면 복호화할 수 없으므로 Google 재연결이 필요하다.

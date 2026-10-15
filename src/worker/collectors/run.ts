@@ -255,13 +255,18 @@ export async function runSync(db: Db, env: Env, opts: SyncOptions = {}): Promise
         results.push({ provider, ok: false, inserted: 0, updated: 0, error: "GITHUB_TOKEN/GITHUB_LOGIN not set", window: win });
         continue;
       }
-      results.push(
-        await runOne(db, provider, win, async () => {
-          const items = await collectGithub(env.GITHUB_TOKEN, env.GITHUB_LOGIN, win);
-          await syncTaskGithubStates(db, env);
-          return items;
-        }),
-      );
+      // 닫힌 할당 Issue 수집을 추가하기 전에는 이 Issue 들이 빠져 있었다. 한 번만 최근 30일로 넓혀 백필한다.
+      const backfillKey = "migrate:github_closed_issues_v1";
+      const needBackfill = !opts.window && (await readSetting(db, backfillKey)) === null;
+      const thirtyDaysAgo = new Date(Date.now() - 30 * DAY).toISOString();
+      const ghWin = needBackfill && win.from > thirtyDaysAgo ? { from: thirtyDaysAgo, to: win.to } : win;
+      const result = await runOne(db, provider, ghWin, async () => {
+        const items = await collectGithub(env.GITHUB_TOKEN, env.GITHUB_LOGIN, ghWin);
+        await syncTaskGithubStates(db, env);
+        return items;
+      });
+      if (needBackfill && result.ok) await writeSetting(db, backfillKey, new Date().toISOString());
+      results.push(result);
     } else if (provider === "google_tasks") {
       results.push(
         await runOne(db, provider, win, async () => {

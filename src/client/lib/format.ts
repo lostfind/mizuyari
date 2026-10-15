@@ -27,9 +27,9 @@ export function sourceGroup(a: Pick<Activity, "source">): "github" | "google" | 
 export function sourceLabel(a: Pick<Activity, "source" | "metadata">): string {
   switch (a.source) {
     case "github_issue":
-      return "Issue";
+      return a.metadata?.state === "CLOSED" ? "Issue closed" : "Issue";
     case "github_pr":
-      return a.metadata?.merged ? "PR merged" : "PR";
+      return a.metadata?.merged ? "PR merged" : a.metadata?.state === "CLOSED" ? "PR closed" : "PR";
     case "github_review":
       return "Review";
     case "task_status":

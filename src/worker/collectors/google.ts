@@ -52,7 +52,7 @@ export async function collectGoogleTasks(accessToken: string, win: CollectWindow
         out.push({
           source: "google_task",
           externalId: `${list.id}:${t.id}`,
-          title: `TODO 완료 · ${t.title.trim()}`,
+          title: t.title.trim(),
           url: t.webViewLink ?? null,
           occurredAt: t.completed,
           metadata: { list: list.title, due: t.due ?? null, notes: t.notes ?? null },
@@ -232,7 +232,7 @@ export async function collectGoogleCalendar(
       out.push({
         source: "calendar_event",
         externalId: e.id,
-        title: `미팅 · ${title}`,
+        title,
         url: e.htmlLink ?? null,
         occurredAt: e.start.dateTime,
         metadata: {

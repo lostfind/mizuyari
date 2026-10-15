@@ -114,7 +114,7 @@
             <div class="line">
               <span class="mono muted w">{hm(e.occurredAt)}</span>
               <span class="dot" style:background={color ?? "transparent"} aria-hidden="true"></span>
-              <span class="ev-title">{e.title.replace(/^미팅 · /, "")}</span>
+              <span class="ev-title">{e.title}</span>
               {#if label}<span class="chip src-manual">{label}</span>{/if}
               {#if response && responseLabel[response]}
                 <span class="chip resp-{response}">{responseLabel[response]}</span>
@@ -184,7 +184,7 @@
         {/each}
         {#each data.recentTodos as a (a.id)}
           {@const busy = busyKeys.has(`done:${a.id}`)}
-          {@const title = a.title.replace(/^TODO 완료 · /, "")}
+          {@const title = a.title}
           <div class="line todo" class:busy>
             <input
               id="done-{a.id}"

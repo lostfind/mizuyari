@@ -86,9 +86,9 @@ function fmtDate(iso: string, tz: string): string {
 function sourceLabel(a: Activity): string {
   switch (a.source) {
     case "github_issue":
-      return "Issue";
+      return a.metadata?.state === "CLOSED" ? "Issue closed" : "Issue";
     case "github_pr":
-      return "PR";
+      return a.metadata?.merged ? "PR merged" : a.metadata?.state === "CLOSED" ? "PR closed" : "PR";
     case "github_review":
       return "Review";
     case "task_status":
@@ -113,7 +113,8 @@ function mdUrl(u: string): string {
 }
 
 function activityLine(a: Activity, tz: string): string {
-  const ref = a.metadata && typeof a.metadata.number === "number" ? `#${a.metadata.number}` : sourceLabel(a);
+  // GitHub 활동은 제목에 (repo#번호) 가 들어 있으므로 링크 텍스트는 라벨(PR merged 등)로 한다.
+  const ref = sourceLabel(a);
   const link = a.url ? `[${ref}](${mdUrl(a.url)})` : ref;
   const note = a.note ? ` — ${a.note}` : "";
   return `- ${mdText(a.title)}${note} (${link}, ${fmtDate(a.occurredAt, tz)})`;

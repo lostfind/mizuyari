@@ -73,7 +73,7 @@ taskRoutes.patch("/:id", async (c) => {
       {
         source: "task_status",
         externalId: `${id}:done`,
-        title: `Task 완료 · ${row.title}`,
+        title: row.title,
         url: null,
         occurredAt: now,
         metadata: { taskId: id, via: "board" },
@@ -107,7 +107,8 @@ taskRoutes.post("/import-github", async (c) => {
   for (const i of issues) {
     if (have.has(i.url)) continue;
     await db.insert(schema.tasks).values({
-      title: `${i.repo}#${i.number} ${i.title}`,
+      // 제목은 GitHub 제목 그대로. repo#번호 는 Board 가 github_url 에서 만들어 보여 준다.
+      title: i.title,
       status: "backlog",
       githubUrl: i.url,
       githubState: "open",
