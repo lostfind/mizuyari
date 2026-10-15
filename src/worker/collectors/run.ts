@@ -56,7 +56,7 @@ export async function upsertActivities(
     const a = { ...item, occurredAt: new Date(item.occurredAt).toISOString() };
     const existing = await db.query.activities.findFirst({
       where: and(eq(schema.activities.source, a.source), eq(schema.activities.externalId, a.externalId)),
-      columns: { id: true, title: true, occurredAt: true, url: true },
+      columns: { id: true, title: true, occurredAt: true, url: true, metadata: true },
     });
     if (!existing) {
       await db.insert(schema.activities).values({
@@ -68,7 +68,12 @@ export async function upsertActivities(
         metadata: a.metadata ?? null,
       });
       inserted++;
-    } else if (existing.title !== a.title || existing.occurredAt !== a.occurredAt || existing.url !== a.url) {
+    } else if (
+      existing.title !== a.title ||
+      existing.occurredAt !== a.occurredAt ||
+      existing.url !== a.url ||
+      JSON.stringify(existing.metadata ?? null) !== JSON.stringify(a.metadata ?? null)
+    ) {
       await db
         .update(schema.activities)
         .set({ title: a.title, url: a.url, occurredAt: a.occurredAt, metadata: a.metadata ?? null })
@@ -102,6 +107,29 @@ async function runOne(
       .set({ finishedAt: new Date().toISOString(), result: "error", error: message.slice(0, 2000) })
       .where(eq(schema.syncRuns.id, run.id));
     return { provider, ok: false, inserted: 0, updated: 0, error: message, window: win };
+  }
+}
+
+/**
+ * 거절·취소된 일정을 지운다. 사용자가 목표·메모·하이라이트를 붙인 행은 지우지 않고
+ * metadata.response 만 declined 로 바꿔 화면에서 숨긴다.
+ */
+async function removeCalendarEvents(db: Db, externalIds: string[]): Promise<void> {
+  for (const externalId of externalIds) {
+    const row = await db.query.activities.findFirst({
+      where: and(eq(schema.activities.source, "calendar_event"), eq(schema.activities.externalId, externalId)),
+    });
+    if (!row) continue;
+    const annotated = row.goalId !== null || row.taskId !== null || row.epicId !== null || row.isHighlight || !!row.note;
+    if (annotated) {
+      if (row.metadata?.response === "declined") continue;
+      await db
+        .update(schema.activities)
+        .set({ metadata: { ...(row.metadata ?? {}), response: "declined" } })
+        .where(eq(schema.activities.id, row.id));
+    } else {
+      await db.delete(schema.activities).where(eq(schema.activities.id, row.id));
+    }
   }
 }
 
@@ -237,7 +265,10 @@ export async function runSync(db: Db, env: Env, opts: SyncOptions = {}): Promise
           // Today 화면에 오늘 남은 일정도 보이도록 오늘 끝까지 가져온다. last_success 는 win.to(지금) 그대로 둔다.
           const endOfToday = dayRangeToIso(todayInTz(env.TIMEZONE), todayInTz(env.TIMEZONE), env.TIMEZONE).to;
           const calWin = { from: win.from, to: win.to > endOfToday ? win.to : endOfToday };
-          return collectGoogleCalendar(token, calWin, { excludeKeywords });
+          const { items, removedIds, palette } = await collectGoogleCalendar(token, calWin, { excludeKeywords });
+          await writeSetting(db, SETTING_KEYS.calendarPalette, JSON.stringify(palette));
+          await removeCalendarEvents(db, removedIds);
+          return items;
         }),
       );
     }
@@ -261,6 +292,10 @@ export async function lastSyncInfo(db: Db): Promise<Array<{ provider: SyncProvid
 // 참고용: 설정 키 목록
 export const SETTING_KEYS = {
   calendarExcludeKeywords: "calendar:exclude_keywords",
+  /** colorId → 배경색 JSON. 동기화 때 갱신 */
+  calendarPalette: "calendar:palette",
+  /** colorId → 사용자가 붙인 라벨 JSON */
+  calendarColorLabels: "calendar:color_labels",
 } as const;
 
 export { sql };
