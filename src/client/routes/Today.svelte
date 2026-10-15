@@ -22,6 +22,18 @@
     return () => window.removeEventListener("mz:synced", h);
   });
 
+  const responseLabel: Record<string, string> = { accepted: "참석", tentative: "미정", needsAction: "미응답" };
+
+  function eventColor(e: TodayData["events"][number]): string | null {
+    const c = e.metadata?.color;
+    return typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c) ? c : null;
+  }
+
+  function eventLabel(e: TodayData["events"][number]): string | null {
+    const id = e.metadata?.colorId;
+    return typeof id === "string" ? (data?.calendarLabels[id] ?? null) : null;
+  }
+
   const dateLabel = $derived.by(() => {
     if (!data) return "";
     const d = new Date(`${data.today}T00:00:00`);
@@ -96,9 +108,17 @@
           <div class="empty">수집된 일정이 없습니다. 동기화 후 표시됩니다.</div>
         {:else}
           {#each data.events as e (e.id)}
+            {@const color = eventColor(e)}
+            {@const label = eventLabel(e)}
+            {@const response = typeof e.metadata?.response === "string" ? e.metadata.response : null}
             <div class="line">
               <span class="mono muted w">{hm(e.occurredAt)}</span>
-              <span>{e.title.replace(/^미팅 · /, "")}</span>
+              <span class="dot" style:background={color ?? "transparent"} aria-hidden="true"></span>
+              <span class="ev-title">{e.title.replace(/^미팅 · /, "")}</span>
+              {#if label}<span class="chip src-manual">{label}</span>{/if}
+              {#if response && responseLabel[response]}
+                <span class="chip resp-{response}">{responseLabel[response]}</span>
+              {/if}
             </div>
           {/each}
         {/if}
@@ -219,6 +239,29 @@
   .line.col {
     flex-direction: column;
     gap: 6px;
+  }
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: none;
+    align-self: center;
+  }
+  .ev-title {
+    flex: 1;
+    min-width: 0;
+  }
+  .resp-accepted {
+    background: var(--green-tint);
+    color: var(--green);
+  }
+  .resp-tentative {
+    background: var(--warn-tint);
+    color: var(--warn);
+  }
+  .resp-needsAction {
+    background: var(--gray-tint);
+    color: var(--text-2);
   }
   .w {
     width: 44px;

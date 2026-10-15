@@ -58,6 +58,8 @@ export interface TodayData {
   goalSummary: { total: number; achieved: number; inProgress: number } | null;
   tasks: Task[];
   events: Activity[];
+  /** Calendar colorId → 사용자가 붙인 라벨 */
+  calendarLabels: Record<string, string>;
   openTodos: GoogleTodo[];
   recentTodos: Activity[];
 }
