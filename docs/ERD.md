@@ -72,6 +72,7 @@ erDiagram
         integer task_id FK "nullable, set null. url = tasks.github_url 로 자동 연결"
         integer epic_id FK "nullable, set null"
         integer is_highlight "boolean"
+        integer is_hidden "boolean, 숨긴 활동"
         text note
         text created_at
     }
@@ -172,6 +173,7 @@ erDiagram
 - **삭제 전파**: Sprint 를 지우면 그 Goal 이 함께 지워지고(cascade), Report 를 지우면 버전 이력이 함께 지워진다. 그 외 FK 는 모두 `set null` 이라 부모를 지워도 Task·Activity·Report 행은 남는다.
 - **활동 upsert**: `(source, external_id)` 로 식별한다. 수집기는 제목·URL·시각만 갱신하고 사용자가 붙인 `goal_id`·`epic_id`·`note`·`is_highlight` 는 건드리지 않는다.
 - **Task 와 활동의 연결**: `activities.url = tasks.github_url` 인 GitHub 활동(`github_issue`·`github_pr`·`github_review`)은 동기화 뒤마다 `task_id` 가 채워진다(`linkActivitiesToTasks`, 멱등). `task_id` 가 있는 활동의 `goal_id` 는 Task 의 `goal_id` 를 그대로 따르는 파생값이라 활동 쪽에서는 바꾸지 않는다(API 는 409). Task 의 목표를 바꾸면 연결된 활동 전부가 따라간다. Task 가 지워지면 `task_id` 만 null 이 되고 `goal_id` 는 남아 일반 활동처럼 편집할 수 있다.
+- **숨긴 활동**: `is_hidden = true` 인 활동은 스프린트의 목표·미연결 목록, 리포트, 기간 집계, Epic 상세에서 빠진다. 스프린트 화면의 「숨긴 활동」 목록에서 다시 표시할 수 있다. 수집기 upsert 는 이 값을 건드리지 않는다.
 - **Task 완료 기록**: `github_url` 이 없는 Task 만 done 이 될 때 `activities(source = task_status, external_id = "<task_id>:done")` 를 남긴다. GitHub 연결 Task 는 수집된 Issue closed / PR merged 활동이 완료 기록을 대신한다.
 - **스프린트 이월과 Task**: Task 는 이월 때 복사되지 않는다. Board 에서 Task 의 목표를 다음 스프린트 목표로 옮기면 그 Task 의 활동 전부가 새 목표로 이동하므로, 이전 스프린트 리포트는 확정한 뒤에 옮기는 것을 전제로 한다. 확정된 리포트 markdown 은 영향을 받지 않는다.
 - **Google TODO 이동**: 미완료 TODO 는 `google_todos` 에만 있고, 완료되면 `activities(source = google_task)` 로 옮겨지며 스냅샷에서 지워진다. 완료 취소 시 반대로 되돌린다. 같은 TODO 가 두 테이블에 동시에 있으면 안 된다.

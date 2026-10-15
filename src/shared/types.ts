@@ -94,6 +94,7 @@ export interface Activity {
   taskId: number | null;
   epicId: number | null;
   isHighlight: boolean;
+  isHidden: boolean;
   note: string | null;
   createdAt: string;
 }
@@ -151,6 +152,8 @@ export interface SprintDetail {
   sprint: Sprint;
   goals: GoalWithActivities[];
   unlinkedActivities: Activity[];
+  /** 숨긴 활동 (목표 연결 여부와 무관, 스프린트 기간 내 + 이 스프린트 목표에 연결된 것) */
+  hiddenActivities: Activity[];
   tasks: Task[];
 }
 

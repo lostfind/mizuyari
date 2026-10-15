@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { EPIC_STATUSES } from "$shared/types";
@@ -42,7 +42,7 @@ epicRoutes.get("/:id", async (c) => {
     .where(eq(schema.goals.epicId, id))
     .orderBy(desc(schema.sprints.startDate), asc(schema.goals.order));
   const activities = await db.query.activities.findMany({
-    where: eq(schema.activities.epicId, id),
+    where: and(eq(schema.activities.epicId, id), eq(schema.activities.isHidden, false)),
     orderBy: [desc(schema.activities.occurredAt)],
   });
   return c.json({ epic, goals, activities });

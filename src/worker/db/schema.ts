@@ -98,6 +98,8 @@ export const activities = sqliteTable(
     taskId: integer("task_id").references(() => tasks.id, { onDelete: "set null" }),
     epicId: integer("epic_id").references(() => epics.id, { onDelete: "set null" }),
     isHighlight: integer("is_highlight", { mode: "boolean" }).notNull().default(false),
+    // 사용자가 불필요하다고 숨긴 활동. 스프린트 목록·리포트·기간 집계에서 빠지고, 화면에서 다시 표시할 수 있다.
+    isHidden: integer("is_hidden", { mode: "boolean" }).notNull().default(false),
     note: text("note"),
     createdAt: text("created_at").notNull().default(now),
   },

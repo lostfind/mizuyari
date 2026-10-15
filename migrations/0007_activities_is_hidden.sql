@@ -1,0 +1,1 @@
+ALTER TABLE `activities` ADD `is_hidden` integer DEFAULT false NOT NULL;

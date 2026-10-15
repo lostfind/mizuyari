@@ -119,7 +119,7 @@ export const api = {
       return get<Activity[]>(`/api/activities?${p}`);
     },
     create: (b: Partial<Activity> & { title: string }) => post<Activity>("/api/activities", b),
-    update: (id: number, b: Partial<Pick<Activity, "goalId" | "epicId" | "taskId" | "isHighlight" | "note" | "title">>) =>
+    update: (id: number, b: Partial<Pick<Activity, "goalId" | "epicId" | "taskId" | "isHighlight" | "isHidden" | "note" | "title">>) =>
       patch<Activity>(`/api/activities/${id}`, b),
     remove: (id: number) => del<{ ok: true }>(`/api/activities/${id}`),
   },
