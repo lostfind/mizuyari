@@ -7,6 +7,7 @@ import type { Db } from "../db";
 import { schema } from "../db";
 import type { Env } from "../env";
 import { getGoogleAccessToken } from "../auth/google";
+import { dayRangeToIso, todayInTz } from "../lib/dates";
 import { collectGithub, fetchGithubStates } from "./github";
 import { collectGoogleCalendar, collectGoogleTasks, fetchOpenGoogleTodos } from "./google";
 import type { CollectWindow, CollectedActivity } from "./types";
@@ -50,7 +51,9 @@ export async function upsertActivities(
 ): Promise<{ inserted: number; updated: number }> {
   let inserted = 0;
   let updated = 0;
-  for (const a of items) {
+  for (const item of items) {
+    // 시각 비교·기간 조회가 문자열 비교이므로 UTC ISO 로 맞춘다 (Calendar 는 +09:00 형식으로 온다).
+    const a = { ...item, occurredAt: new Date(item.occurredAt).toISOString() };
     const existing = await db.query.activities.findFirst({
       where: and(eq(schema.activities.source, a.source), eq(schema.activities.externalId, a.externalId)),
       columns: { id: true, title: true, occurredAt: true, url: true },
@@ -208,7 +211,10 @@ export async function runSync(db: Db, env: Env, opts: SyncOptions = {}): Promise
       results.push(
         await runOne(db, provider, win, async () => {
           const token = await getGoogleAccessToken(db, env);
-          return collectGoogleCalendar(token, win, { excludeKeywords });
+          // Today 화면에 오늘 남은 일정도 보이도록 오늘 끝까지 가져온다. last_success 는 win.to(지금) 그대로 둔다.
+          const endOfToday = dayRangeToIso(todayInTz(env.TIMEZONE), todayInTz(env.TIMEZONE), env.TIMEZONE).to;
+          const calWin = { from: win.from, to: win.to > endOfToday ? win.to : endOfToday };
+          return collectGoogleCalendar(token, calWin, { excludeKeywords });
         }),
       );
     }
