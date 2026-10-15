@@ -7,6 +7,7 @@
   let status = $state<SyncStatus[]>([]);
   let settings = $state<Record<string, string>>({});
   let excludeKeywords = $state("");
+  let colorLabels = $state<Record<string, string>>({});
   let config = $state<{ githubLogin: string | null; timezone: string; fiscalYearStartMonth: number; reportLang: string } | null>(null);
   let msg = $state("");
   let busy = $state(false);
@@ -20,6 +21,38 @@
   async function load() {
     [status, settings, config] = await Promise.all([api.sync.status(), api.sync.settings(), api.config()]);
     excludeKeywords = settings["calendar:exclude_keywords"] ?? "";
+    colorLabels = parseJson(settings["calendar:color_labels"]);
+  }
+
+  function parseJson(raw: string | undefined): Record<string, string> {
+    try {
+      const v = raw ? JSON.parse(raw) : {};
+      return v && typeof v === "object" ? v : {};
+    } catch {
+      return {};
+    }
+  }
+
+  // 동기화 때 저장된 Google 일정 색상 팔레트 (colorId → 배경색)
+  const palette = $derived(
+    Object.entries(parseJson(settings["calendar:palette"]))
+      .filter(([, c]) => /^#[0-9a-f]{6}$/i.test(c))
+      .sort(([a], [b]) => Number(a) - Number(b)),
+  );
+
+  async function saveColorLabels() {
+    busy = true;
+    try {
+      const cleaned = Object.fromEntries(
+        Object.entries(colorLabels)
+          .map(([k, v]) => [k, v.trim()])
+          .filter(([, v]) => v),
+      );
+      settings = await api.sync.saveSettings({ "calendar:color_labels": JSON.stringify(cleaned) });
+      msg = "저장했습니다";
+    } finally {
+      busy = false;
+    }
   }
 
   onMount(load);
@@ -115,12 +148,46 @@
     </div>
   </section>
 
+  <section class="card sec">
+    <h2>Calendar 색상 라벨</h2>
+    <p class="muted small">Google Calendar API 는 색상에 붙인 이름을 제공하지 않아서, 여기서 색상별 라벨을 지정합니다. 비워 두면 라벨 없이 색만 표시합니다.</p>
+    {#if palette.length === 0}
+      <div class="muted small">Google Calendar 를 한 번 동기화하면 색상 목록이 나타납니다.</div>
+    {:else}
+      <div class="labels">
+        {#each palette as [id, color] (id)}
+          <label class="row label-row">
+            <span class="swatch" style:background={color} aria-hidden="true"></span>
+            <input class="input" value={colorLabels[id] ?? ""} oninput={(e) => (colorLabels[id] = e.currentTarget.value)} placeholder="라벨 (예: 외부 미팅)" aria-label="색상 {id} 라벨" />
+          </label>
+        {/each}
+      </div>
+      <div class="row">
+        <button class="btn primary" onclick={saveColorLabels} disabled={busy}>저장</button>
+      </div>
+    {/if}
+  </section>
+
   {#if msg}<div class="muted small">{msg}</div>{/if}
 </div>
 
 <style>
   .page.narrow {
     max-width: 760px;
+  }
+  .labels {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px 12px;
+  }
+  .label-row {
+    flex-wrap: nowrap;
+  }
+  .swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex: none;
   }
   .sec {
     padding: 18px;
