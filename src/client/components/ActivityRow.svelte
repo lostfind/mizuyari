@@ -45,7 +45,7 @@
   const taskLinked = $derived(activity.taskId !== null);
 </script>
 
-<li class="act" class:busy>
+<li class="act" class:busy class:hidden={activity.isHidden}>
   <span class="date mono">{md(activity.occurredAt)}</span>
   <span class="chip src-{sourceGroup(activity)}">{sourceLabel(activity)}</span>
   <span class="title">
@@ -58,6 +58,9 @@
       <span class="note">— {activity.note}</span>
     {/if}
   </span>
+  {#if activity.isHidden}
+    <button class="btn sm" onclick={() => update({ isHidden: false })} disabled={busy}>다시 표시</button>
+  {:else}
   <button
     class="star"
     class:on={activity.isHighlight}
@@ -71,6 +74,11 @@
     </svg>
   </button>
   <button class="btn sm" onclick={startNote} disabled={busy}>메모</button>
+  <button class="hide" title="숨기기 (리포트에서도 빠집니다)" aria-label="숨기기" onclick={() => update({ isHidden: true })} disabled={busy}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+      <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A9.8 9.8 0 0 1 12 5c5 0 8.5 4.5 9.5 7a13 13 0 0 1-2.6 3.8M6.3 6.3A13 13 0 0 0 2.5 12c1 2.5 4.5 7 9.5 7a9.6 9.6 0 0 0 4.2-1" />
+    </svg>
+  </button>
   {#if showGoal}
     {#if taskLinked}
       <span class="chip goal" class:none={!goalLabel} title="Board 의 Task 목표를 따릅니다. 바꾸려면 Board 에서 수정하세요.">{goalLabel ?? "목표 없음"}</span>
@@ -92,7 +100,8 @@
       <span class="chip goal">{goalLabel}</span>
     {/if}
   {/if}
-  {#if editingNote}
+  {/if}
+  {#if editingNote && !activity.isHidden}
     <div class="note-edit">
       <input class="input" bind:value={noteDraft} placeholder="리포트에 우선 반영되는 메모" onkeydown={(e) => isSubmitEnter(e) && saveNote()} />
       <button class="btn sm primary" onclick={saveNote} disabled={busy}>저장</button>
@@ -145,6 +154,24 @@
   .star.on,
   .star:hover {
     opacity: 1;
+  }
+  .hide {
+    border: none;
+    background: transparent;
+    padding: 4px;
+    cursor: pointer;
+    line-height: 0;
+    color: var(--text-3);
+    opacity: 0.6;
+  }
+  .hide:hover {
+    opacity: 1;
+    color: var(--text-2);
+  }
+  .act.hidden .title,
+  .act.hidden .date,
+  .act.hidden .chip {
+    opacity: 0.55;
   }
   .goal-select {
     width: auto;
