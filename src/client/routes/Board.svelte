@@ -3,7 +3,7 @@
   import type { Goal, Sprint, Task, TaskStatus } from "$shared/types";
   import { TASK_STATUSES } from "$shared/types";
   import { api } from "../lib/api";
-  import { safeHref, TASK_STATUS_LABEL, ymdShort } from "../lib/format";
+  import { GITHUB_STATE_LABEL, githubRef, safeHref, TASK_STATUS_LABEL, ymdShort } from "../lib/format";
   import { isSubmitEnter } from "../lib/keys";
 
   let tasks = $state<Task[]>([]);
@@ -187,8 +187,13 @@
               <button class="task-title" onclick={() => startEdit(t)}>{t.title}</button>
               <div class="meta">
                 {#if t.githubUrl}
-                  <a class="mono" href={safeHref(t.githubUrl)} target="_blank" rel="noopener">{t.githubUrl.replace(/^https:\/\/github\.com\//, "").replace(/\/(issues|pull)\//, "#")}</a>
-                  {#if t.githubState && t.githubState !== "open"}<span class="chip src-github">{t.githubState}</span>{/if}
+                  {@const gh = githubRef(t.githubUrl)}
+                  {#if gh.kind}
+                    <span class="chip gh-{gh.kind}" class:gh-done={t.githubState && t.githubState !== "open"}>
+                      {gh.kind === "pr" ? "PR" : "Issue"}{#if t.githubState && GITHUB_STATE_LABEL[t.githubState]}&nbsp;· {GITHUB_STATE_LABEL[t.githubState]}{/if}
+                    </span>
+                  {/if}
+                  <a class="mono" href={safeHref(t.githubUrl)} target="_blank" rel="noopener">{gh.ref}</a>
                 {/if}
                 {#if t.goalId && goalById.get(t.goalId)}<span class="chip goal">{goalById.get(t.goalId)!.title}</span>{/if}
                 {#if t.dueDate}<span class="chip warn">마감 {ymdShort(t.dueDate)}</span>{/if}

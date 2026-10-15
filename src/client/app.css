@@ -231,6 +231,19 @@ h3 {
   background: var(--accent-tint);
   color: var(--accent-strong);
 }
+/* Board·Today 의 GitHub 종류. Issue 는 초록, PR 은 파랑. 닫힘·머지되면 회색 */
+.gh-issue {
+  background: var(--green-tint);
+  color: var(--green);
+}
+.gh-pr {
+  background: var(--blue-tint);
+  color: var(--blue);
+}
+.gh-done {
+  background: var(--gray-tint);
+  color: var(--text-2);
+}
 .src-manual {
   background: var(--gray-tint);
   color: var(--text-2);
