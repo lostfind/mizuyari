@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { Activity, Epic, Sprint, SprintDetail } from "$shared/types";
+  import { isEffectivelyHidden, type Activity, type Epic, type Sprint, type SprintDetail } from "$shared/types";
   import ActivityRow from "../components/ActivityRow.svelte";
   import GoalCard from "../components/GoalCard.svelte";
   import { api, ApiError } from "../lib/api";
@@ -126,7 +126,7 @@
   function onActivityChange(updated: Activity) {
     if (!detail) return;
     // 숨김·다시 표시는 목록 간 이동이므로 재조회
-    if (updated.isHidden !== !!detail.hiddenActivities.some((a) => a.id === updated.id)) {
+    if (isEffectivelyHidden(updated) !== detail.hiddenActivities.some((a) => a.id === updated.id)) {
       load();
       return;
     }

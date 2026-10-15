@@ -1,6 +1,7 @@
 // 여러 라우트가 함께 쓰는 조회 로직.
 
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { AUTO_HIDDEN_CALENDAR_RESPONSES, isEffectivelyHidden } from "$shared/types";
 import type { Activity, Goal, GoalStatus, GoalWithActivities, Sprint, SprintDetail } from "$shared/types";
 import type { Db } from "../db";
 import { schema } from "../db";
@@ -9,6 +10,18 @@ import { dayRangeToIso } from "./dates";
 export function toActivity(row: typeof schema.activities.$inferSelect): Activity {
   return { ...row, metadata: row.metadata ?? null };
 }
+
+/**
+ * 화면·리포트에 보이는 활동 조건: 사용자가 숨기지 않았고, 미정·거절 응답의 캘린더 일정도 아니다.
+ * 판정 규칙은 $shared/types 의 isEffectivelyHidden 과 같다.
+ */
+export const visibleActivity = and(
+  eq(schema.activities.isHidden, false),
+  sql`not (${schema.activities.source} = 'calendar_event' and coalesce(json_extract(${schema.activities.metadata}, '$.response'), '') in (${sql.join(
+    AUTO_HIDDEN_CALENDAR_RESPONSES.map((r) => sql`${r}`),
+    sql`, `,
+  )}))`,
+)!;
 
 export async function getCurrentSprint(db: Db, today: string): Promise<Sprint | null> {
   // 오늘을 포함하는 active 스프린트 → 없으면 가장 최근 active
@@ -49,10 +62,10 @@ export async function getSprintDetail(db: Db, sprintId: number, tz: string): Pro
     goalIds.length ? inArray(schema.activities.goalId, goalIds) : undefined,
   );
   const rows = await db.query.activities.findMany({ where: inSprint, orderBy: [desc(schema.activities.occurredAt)] });
-  const visible = rows.filter((a) => !a.isHidden);
+  const visible = rows.filter((a) => !isEffectivelyHidden(toActivity(a)));
   const linked = visible.filter((a) => a.goalId !== null);
   const unlinked = visible.filter((a) => a.goalId === null);
-  const hidden = rows.filter((a) => a.isHidden);
+  const hidden = rows.filter((a) => isEffectivelyHidden(toActivity(a)));
 
   const goals: GoalWithActivities[] = goalRows.map((g) => ({
     ...g,
@@ -85,7 +98,7 @@ export async function getPeriodData(db: Db, periodStart: string, periodEnd: stri
 
   const { from, to } = dayRangeToIso(periodStart, periodEnd, tz);
   const activityRows = await db.query.activities.findMany({
-    where: and(gte(schema.activities.occurredAt, from), lt(schema.activities.occurredAt, to), eq(schema.activities.isHidden, false)),
+    where: and(gte(schema.activities.occurredAt, from), lt(schema.activities.occurredAt, to), visibleActivity),
     orderBy: [asc(schema.activities.occurredAt)],
   });
   const activities = activityRows.map(toActivity);

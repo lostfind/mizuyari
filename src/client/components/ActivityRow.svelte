@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Activity, Goal } from "$shared/types";
+  import { autoHiddenReason, isEffectivelyHidden, type Activity, type Goal } from "$shared/types";
   import { api } from "../lib/api";
   import { md, safeHref, sourceGroup, sourceLabel } from "../lib/format";
   import { isSubmitEnter } from "../lib/keys";
@@ -43,9 +43,11 @@
   const goalLabel = $derived(goals.find((g) => g.id === activity.goalId)?.title ?? null);
   // Board 의 Task 에 연결된 활동은 목표를 Task 에서 물려받으므로 읽기 전용으로 보여 준다.
   const taskLinked = $derived(activity.taskId !== null);
+  const autoHidden = $derived(autoHiddenReason(activity));
+  const hidden = $derived(isEffectivelyHidden(activity));
 </script>
 
-<li class="act" class:busy class:hidden={activity.isHidden}>
+<li class="act" class:busy class:hidden>
   <span class="date mono">{md(activity.occurredAt)}</span>
   <span class="chip src-{sourceGroup(activity)}">{sourceLabel(activity)}</span>
   <span class="title">
@@ -58,8 +60,13 @@
       <span class="note">— {activity.note}</span>
     {/if}
   </span>
-  {#if activity.isHidden}
-    <button class="btn sm" onclick={() => update({ isHidden: false })} disabled={busy}>다시 표시</button>
+  {#if hidden}
+    {#if autoHidden}
+      <span class="chip auto" title="Google 캘린더에서 참석으로 바꾸면 다음 동기화 뒤 다시 표시됩니다">{autoHidden === "tentative" ? "미정" : "거절"}</span>
+    {/if}
+    {#if activity.isHidden}
+      <button class="btn sm" onclick={() => update({ isHidden: false })} disabled={busy}>다시 표시</button>
+    {/if}
   {:else}
   <button
     class="star"
@@ -101,7 +108,7 @@
     {/if}
   {/if}
   {/if}
-  {#if editingNote && !activity.isHidden}
+  {#if editingNote && !hidden}
     <div class="note-edit">
       <input class="input" bind:value={noteDraft} placeholder="리포트에 우선 반영되는 메모" onkeydown={(e) => isSubmitEnter(e) && saveNote()} />
       <button class="btn sm primary" onclick={saveNote} disabled={busy}>저장</button>
@@ -167,6 +174,10 @@
   .hide:hover {
     opacity: 1;
     color: var(--text-2);
+  }
+  .chip.auto {
+    background: var(--warn-tint);
+    color: var(--warn);
   }
   .act.hidden .title,
   .act.hidden .date,
