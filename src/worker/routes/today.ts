@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb, schema } from "../db";
 import { addDays, dayRangeToIso, todayInTz } from "../lib/dates";
+import { SETTING_KEYS } from "../collectors/run";
 import { getCurrentSprint, toActivity } from "../lib/queries";
 import type { AppContext } from "../lib/session";
 
@@ -37,6 +38,16 @@ todayRoutes.get("/", async (c) => {
     orderBy: [asc(schema.activities.occurredAt)],
   });
 
+  // 거절한 일정은 수집 단계에서 지우지만, 메모 등이 붙어 남겨 둔 행은 여기서 숨긴다.
+  const visibleEvents = events.map(toActivity).filter((e) => e.metadata?.response !== "declined");
+  const labelRow = await db.query.settings.findFirst({ where: eq(schema.settings.key, SETTING_KEYS.calendarColorLabels) });
+  let calendarLabels: Record<string, string> = {};
+  try {
+    calendarLabels = labelRow ? JSON.parse(labelRow.value) : {};
+  } catch {
+    // 잘못 저장된 값은 무시한다
+  }
+
   const openTodos = await db.query.googleTodos.findMany({
     orderBy: [asc(schema.googleTodos.due), asc(schema.googleTodos.listTitle), asc(schema.googleTodos.position)],
     limit: 50,
@@ -54,7 +65,8 @@ todayRoutes.get("/", async (c) => {
     sprint,
     goalSummary,
     tasks,
-    events: events.map(toActivity),
+    events: visibleEvents,
+    calendarLabels,
     openTodos,
     recentTodos: recentTodos.map(toActivity),
   });

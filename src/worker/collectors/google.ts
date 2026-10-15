@@ -148,6 +148,7 @@ interface GEvent {
   start: { dateTime?: string; date?: string };
   end: { dateTime?: string; date?: string };
   attendees?: Array<{ self?: boolean; responseStatus?: string }>;
+  colorId?: string;
   organizer?: { self?: boolean };
   eventType?: string;
   transparency?: string;
@@ -158,13 +159,41 @@ export interface CalendarOptions {
   excludeKeywords?: string[];
 }
 
+/** 내 응답 상태. 주최자이면 accepted, 참석자 목록이 없으면 null */
+export type CalendarResponse = "accepted" | "tentative" | "needsAction" | "declined";
+
+/** 일정 색상 팔레트 (colorId → 배경색). Google 이 정한 고정 팔레트라 라벨 이름은 없다. */
+export type CalendarPalette = Record<string, string>;
+
+export interface CalendarCollectResult {
+  items: CollectedActivity[];
+  /** 거절했거나 취소된 일정 id. 이미 저장된 행을 정리하는 데 쓴다. */
+  removedIds: string[];
+  palette: CalendarPalette;
+}
+
+async function fetchCalendarColors(accessToken: string): Promise<{ palette: CalendarPalette; defaultColor: string | null }> {
+  const colors = await gfetch<{ event?: Record<string, { background: string }> }>(
+    accessToken,
+    "https://www.googleapis.com/calendar/v3/colors",
+  );
+  const primary = await gfetch<{ backgroundColor?: string }>(
+    accessToken,
+    "https://www.googleapis.com/calendar/v3/users/me/calendarList/primary",
+  );
+  const palette = Object.fromEntries(Object.entries(colors.event ?? {}).map(([id, c]) => [id, c.background]));
+  return { palette, defaultColor: primary.backgroundColor ?? null };
+}
+
 export async function collectGoogleCalendar(
   accessToken: string,
   win: CollectWindow,
   opts: CalendarOptions = {},
-): Promise<CollectedActivity[]> {
+): Promise<CalendarCollectResult> {
   const exclude = (opts.excludeKeywords ?? []).map((k) => k.toLowerCase()).filter(Boolean);
+  const { palette, defaultColor } = await fetchCalendarColors(accessToken);
   const out: CollectedActivity[] = [];
+  const removedIds: string[] = [];
   let pageToken: string | undefined;
   do {
     const params = new URLSearchParams({
@@ -174,6 +203,7 @@ export async function collectGoogleCalendar(
       orderBy: "startTime",
       maxResults: "250",
       eventTypes: "default",
+      showDeleted: "true",
     });
     if (pageToken) params.set("pageToken", pageToken);
     const page = await gfetch<{ items?: GEvent[]; nextPageToken?: string }>(
@@ -181,14 +211,20 @@ export async function collectGoogleCalendar(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
     );
     for (const e of page.items ?? []) {
-      if (e.status === "cancelled") continue;
+      if (e.status === "cancelled") {
+        removedIds.push(e.id);
+        continue;
+      }
       if (!e.start.dateTime) continue; // 종일 일정 제외
       const title = (e.summary ?? "").trim();
       if (!title) continue;
       if (exclude.some((k) => title.toLowerCase().includes(k))) continue;
       // 거절한 일정 제외
       const me = e.attendees?.find((a) => a.self);
-      if (me?.responseStatus === "declined") continue;
+      if (me?.responseStatus === "declined") {
+        removedIds.push(e.id);
+        continue;
+      }
       // 본인 혼자인 일정(참석자 없음, 본인이 주최)은 미팅이 아닌 블록으로 보고 제외
       if (!e.attendees?.length && e.organizer?.self) continue;
       if (e.transparency === "transparent") continue;
@@ -199,10 +235,16 @@ export async function collectGoogleCalendar(
         title: `미팅 · ${title}`,
         url: e.htmlLink ?? null,
         occurredAt: e.start.dateTime,
-        metadata: { end: e.end.dateTime ?? null, attendees: e.attendees?.length ?? 0 },
+        metadata: {
+          end: e.end.dateTime ?? null,
+          attendees: e.attendees?.length ?? 0,
+          colorId: e.colorId ?? null,
+          color: (e.colorId && palette[e.colorId]) || defaultColor,
+          response: e.organizer?.self ? "accepted" : ((me?.responseStatus as CalendarResponse | undefined) ?? null),
+        },
       });
     }
     pageToken = page.nextPageToken;
   } while (pageToken);
-  return out;
+  return { items: out, removedIds, palette };
 }
