@@ -8,6 +8,7 @@ import { schema } from "../db";
 import type { Env } from "../env";
 import { getGoogleAccessToken } from "../auth/google";
 import { dayRangeToIso, todayInTz } from "../lib/dates";
+import { linkActivitiesToTasks } from "../lib/taskLink";
 import { collectGithub, fetchGithubStates } from "./github";
 import { collectGoogleCalendar, collectGoogleTasks, fetchOpenGoogleTodos } from "./google";
 import type { CollectWindow, CollectedActivity } from "./types";
@@ -176,7 +177,10 @@ export async function deleteReopenedTodoActivities(db: Db, openKeys: Set<string>
   return deleted;
 }
 
-/** Task 에 연결된 GitHub Issue/PR 상태를 동기화하고, 닫히면 Task 를 done 으로 옮긴다. */
+/**
+ * Task 에 연결된 GitHub Issue/PR 상태를 동기화하고, 닫히면 Task 를 done 으로 옮긴다.
+ * 완료 기록은 수집된 Issue closed / PR merged 활동이 대신하므로 task_status 활동은 만들지 않는다.
+ */
 export async function syncTaskGithubStates(db: Db, env: Env): Promise<number> {
   const rows = await db
     .select({ id: schema.tasks.id, githubUrl: schema.tasks.githubUrl, status: schema.tasks.status })
@@ -201,26 +205,36 @@ export async function syncTaskGithubStates(db: Db, env: Env): Promise<number> {
         updatedAt: now,
       })
       .where(eq(schema.tasks.id, r.id));
-    if (closed) {
-      changed++;
-      // Task 상태 변경을 활동으로 기록 (중복 방지: task_status:<id>:done)
-      await upsertActivities(db, [
-        {
-          source: "task_status",
-          externalId: `${r.id}:done`,
-          title: `Task 완료 · ${s.title}`,
-          url: r.githubUrl,
-          occurredAt: now,
-          metadata: { taskId: r.id, via: "github", state: s.state },
-        },
-      ]);
-      await db
-        .update(schema.activities)
-        .set({ taskId: r.id })
-        .where(and(eq(schema.activities.source, "task_status"), eq(schema.activities.externalId, `${r.id}:done`)));
-    }
+    if (closed) changed++;
   }
   return changed;
+}
+
+/**
+ * 한 번만 도는 정리: 예전에는 GitHub 연결 Task 가 done 될 때도 task_status 활동을 만들어 Issue closed 와 겹쳤다.
+ * 메모·하이라이트가 없는 중복 행을 지운다. 완료 여부는 settings 에 남긴다.
+ */
+async function cleanupDuplicateTaskStatus(db: Db): Promise<number> {
+  const key = "migrate:task_link_v1";
+  if ((await readSetting(db, key)) !== null) return 0;
+  const linkedTasks = await db.query.tasks.findMany({ where: isNotNull(schema.tasks.githubUrl), columns: { id: true } });
+  let deleted = 0;
+  for (const t of linkedTasks) {
+    const r = await db
+      .delete(schema.activities)
+      .where(
+        and(
+          eq(schema.activities.source, "task_status"),
+          eq(schema.activities.externalId, `${t.id}:done`),
+          eq(schema.activities.isHighlight, false),
+          sql`coalesce(${schema.activities.note}, '') = ''`,
+        ),
+      )
+      .returning({ id: schema.activities.id });
+    deleted += r.length;
+  }
+  await writeSetting(db, key, new Date().toISOString());
+  return deleted;
 }
 
 export interface SyncOptions {
@@ -273,6 +287,9 @@ export async function runSync(db: Db, env: Env, opts: SyncOptions = {}): Promise
       );
     }
   }
+  // 수집된 활동을 Task 와 잇고 goal_id 를 Task 에 맞춘다 (멱등).
+  await linkActivitiesToTasks(db);
+  await cleanupDuplicateTaskStatus(db);
   return results;
 }
 

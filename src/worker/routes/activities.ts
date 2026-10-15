@@ -82,6 +82,12 @@ activityRoutes.patch("/:id", async (c) => {
     }),
   );
   const db = createDb(c.env.DB);
+  const existing = await db.query.activities.findFirst({ where: eq(schema.activities.id, id), columns: { taskId: true } });
+  if (!existing) throw new HttpError(404, "activity not found");
+  // Task 에서 나온 활동의 목표는 Task 를 따르므로 활동 쪽에서는 바꾸지 않는다.
+  if (existing.taskId !== null && (body.goalId !== undefined || body.taskId !== undefined)) {
+    throw new HttpError(409, "Task 에 연결된 활동입니다. 목표는 Board 의 Task 에서 바꾸세요.");
+  }
   const [row] = await db.update(schema.activities).set(body).where(eq(schema.activities.id, id)).returning();
   if (!row) throw new HttpError(404, "activity not found");
   return c.json(toActivity(row));

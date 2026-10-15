@@ -7,6 +7,7 @@ import { upsertActivities } from "../collectors/run";
 import { createDb, schema } from "../db";
 import { isYmd } from "../lib/dates";
 import type { AppContext } from "../lib/session";
+import { linkActivitiesToTasks, propagateTaskGoal } from "../lib/taskLink";
 import { HttpError, httpUrl, idParam, parseBody } from "../lib/validate";
 
 const createSchema = z.object({
@@ -41,6 +42,7 @@ taskRoutes.post("/", async (c) => {
   const body = await parseBody(c, createSchema);
   const db = createDb(c.env.DB);
   const [row] = await db.insert(schema.tasks).values(body).returning();
+  if (row.githubUrl) await linkActivitiesToTasks(db, row.id);
   return c.json(row, 201);
 });
 
@@ -57,14 +59,22 @@ taskRoutes.patch("/:id", async (c) => {
     .where(eq(schema.tasks.id, id))
     .returning();
 
-  // done 으로 바뀌면 활동으로 기록해 리포트에 잡히게 한다
-  if (body.status === "done" && before.status !== "done") {
+  // GitHub 연결이 바뀌면 같은 url 의 수집 활동을 다시 잇고, 목표가 바뀌면 연결된 활동이 따라가게 한다.
+  if (body.githubUrl !== undefined && body.githubUrl !== before.githubUrl) {
+    await linkActivitiesToTasks(db, id);
+  } else if (body.goalId !== undefined && body.goalId !== before.goalId) {
+    await propagateTaskGoal(db, id, row.goalId);
+  }
+
+  // GitHub 연결이 없는 Task 가 done 으로 바뀌면 활동으로 기록해 리포트에 잡히게 한다.
+  // GitHub 연결 Task 는 수집된 Issue closed / PR merged 활동이 완료 기록을 대신한다.
+  if (body.status === "done" && before.status !== "done" && !row.githubUrl) {
     await upsertActivities(db, [
       {
         source: "task_status",
         externalId: `${id}:done`,
         title: `Task 완료 · ${row.title}`,
-        url: row.githubUrl,
+        url: null,
         occurredAt: now,
         metadata: { taskId: id, via: "board" },
       },
@@ -105,5 +115,6 @@ taskRoutes.post("/import-github", async (c) => {
     });
     imported++;
   }
+  if (imported) await linkActivitiesToTasks(db);
   return c.json({ imported, total: issues.length });
 });
