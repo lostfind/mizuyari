@@ -269,7 +269,7 @@
         {:else}
           <ul class="list">
             {#each filtered as a (a.id)}
-              <ActivityRow activity={a} goals={goalOptions} tasks={detail.tasks} onchange={onActivityChange} />
+              <ActivityRow activity={a} goals={goalOptions} onchange={onActivityChange} />
             {/each}
           </ul>
         {/if}

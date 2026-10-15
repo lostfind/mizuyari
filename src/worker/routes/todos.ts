@@ -42,7 +42,7 @@ todoRoutes.post("/:id/complete", async (c) => {
     {
       source: "google_task",
       externalId: `${todo.listId}:${todo.taskId}`,
-      title: `TODO 완료 · ${todo.title}`,
+      title: todo.title,
       url: todo.webViewLink,
       occurredAt: completedAt,
       metadata: { list: todo.listTitle, due: todo.due, notes: todo.notes, via: "mizuyari" },
@@ -81,7 +81,7 @@ todoRoutes.post("/reopen/:id", async (c) => {
       listId,
       listTitle,
       taskId,
-      title: t.title?.trim() || activity.title.replace(/^TODO 완료 · /, ""),
+      title: t.title?.trim() || activity.title,
       notes: t.notes ?? null,
       due: t.due ?? null,
       webViewLink: t.webViewLink ?? activity.url,

@@ -73,7 +73,7 @@ taskRoutes.patch("/:id", async (c) => {
       {
         source: "task_status",
         externalId: `${id}:done`,
-        title: `Task 완료 · ${row.title}`,
+        title: row.title,
         url: null,
         occurredAt: now,
         metadata: { taskId: id, via: "board" },
