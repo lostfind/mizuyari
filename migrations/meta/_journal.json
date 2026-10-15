@@ -50,6 +50,13 @@
       "when": 1792075251685,
       "tag": "0006_strip_activity_title_prefix",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792075603094,
+      "tag": "0007_activities_is_hidden",
+      "breakpoints": true
     }
   ]
 }

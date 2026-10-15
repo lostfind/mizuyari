@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { Activity, Epic, Sprint, SprintDetail } from "$shared/types";
+  import { isEffectivelyHidden, type Activity, type Epic, type Sprint, type SprintDetail } from "$shared/types";
   import ActivityRow from "../components/ActivityRow.svelte";
   import GoalCard from "../components/GoalCard.svelte";
   import { api, ApiError } from "../lib/api";
@@ -16,6 +16,7 @@
   let loading = $state(true);
   let error = $state("");
   let filter = $state<"all" | "github" | "google" | "task" | "manual">("all");
+  let showHidden = $state(false);
 
   // 새 목표
   let newTitle = $state("");
@@ -124,6 +125,11 @@
 
   function onActivityChange(updated: Activity) {
     if (!detail) return;
+    // 숨김·다시 표시는 목록 간 이동이므로 재조회
+    if (isEffectivelyHidden(updated) !== detail.hiddenActivities.some((a) => a.id === updated.id)) {
+      load();
+      return;
+    }
     // 재조회 대신 로컬 갱신 (연결 변경은 목록 간 이동이 필요하므로 재조회)
     const wasLinked = detail.goals.some((g) => g.activities.some((a) => a.id === updated.id));
     const nowLinked = updated.goalId !== null;
@@ -137,6 +143,7 @@
 
   const allActivities = $derived.by(() => {
     if (!detail) return [] as Activity[];
+    if (showHidden) return [...detail.hiddenActivities];
     const linked = detail.goals.flatMap((g) => g.activities);
     return [...linked, ...detail.unlinkedActivities].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   });
@@ -153,6 +160,7 @@
 
   const goalOptions = $derived(detail?.goals.map((g) => ({ id: g.id, title: g.title })) ?? []);
   const outsideCount = $derived(detail?.unlinkedActivities.length ?? 0);
+  const hiddenCount = $derived(detail?.hiddenActivities.length ?? 0);
   const meetingSoon = $derived.by(() => {
     if (!detail?.sprint.meetingDate) return "";
     const diff = Math.round((new Date(detail.sprint.meetingDate).getTime() - new Date(todayYmd()).getTime()) / 86400000);
@@ -257,15 +265,24 @@
 
       <section class="card acts" aria-labelledby="acts-h">
         <div class="sec-head wrap">
-          <h2 id="acts-h">수집된 활동 <span class="muted" style="font-weight:400;font-size:14px">{filtered.length}건</span></h2>
+          <h2 id="acts-h">
+            {showHidden ? "숨긴 활동" : "수집된 활동"} <span class="muted" style="font-weight:400;font-size:14px">{filtered.length}건</span>
+          </h2>
           <div class="filters" role="group" aria-label="출처 필터">
             {#each [["all", "전체"], ["github", "GitHub"], ["google", "Google"], ["task", "Task"], ["manual", "직접"]] as [k, label] (k)}
               <button class="f" class:on={filter === k} aria-pressed={filter === k} onclick={() => (filter = k as typeof filter)}>{label}</button>
             {/each}
+            {#if hiddenCount || showHidden}
+              <button class="f hidden-toggle" class:on={showHidden} aria-pressed={showHidden} onclick={() => (showHidden = !showHidden)}>
+                {showHidden ? "숨긴 활동 닫기" : `숨긴 활동 ${hiddenCount}`}
+              </button>
+            {/if}
           </div>
         </div>
         {#if filtered.length === 0}
-          <div class="empty">이 기간에 수집된 활동이 없습니다. 상단의 "지금 동기화"를 눌러 보세요.</div>
+          <div class="empty">
+            {showHidden ? "숨긴 활동이 없습니다." : '이 기간에 수집된 활동이 없습니다. 상단의 "지금 동기화"를 눌러 보세요.'}
+          </div>
         {:else}
           <ul class="list">
             {#each filtered as a (a.id)}
@@ -388,6 +405,12 @@
     background: var(--text);
     border-color: var(--text);
     color: #fff;
+  }
+  .f.hidden-toggle {
+    border-style: dashed;
+  }
+  .f.hidden-toggle.on {
+    border-style: solid;
   }
   .list {
     margin: 0;

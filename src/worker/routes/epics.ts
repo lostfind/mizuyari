@@ -1,8 +1,9 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { EPIC_STATUSES } from "$shared/types";
 import { createDb, schema } from "../db";
+import { visibleActivity } from "../lib/queries";
 import type { AppContext } from "../lib/session";
 import { HttpError, idParam, parseBody } from "../lib/validate";
 
@@ -42,7 +43,7 @@ epicRoutes.get("/:id", async (c) => {
     .where(eq(schema.goals.epicId, id))
     .orderBy(desc(schema.sprints.startDate), asc(schema.goals.order));
   const activities = await db.query.activities.findMany({
-    where: eq(schema.activities.epicId, id),
+    where: and(eq(schema.activities.epicId, id), visibleActivity),
     orderBy: [desc(schema.activities.occurredAt)],
   });
   return c.json({ epic, goals, activities });

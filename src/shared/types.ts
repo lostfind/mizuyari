@@ -94,8 +94,24 @@ export interface Activity {
   taskId: number | null;
   epicId: number | null;
   isHighlight: boolean;
+  isHidden: boolean;
   note: string | null;
   createdAt: string;
+}
+
+/** 미정·거절 응답의 캘린더 일정은 Today 에만 보이고 Sprint 활동·리포트·기간 집계에서는 숨긴 것으로 다룬다. */
+export const AUTO_HIDDEN_CALENDAR_RESPONSES = ["tentative", "declined"] as const;
+
+/** 응답 상태 때문에 자동으로 숨겨지는 활동인지. 응답이 바뀌면 다음 동기화 뒤 자동으로 다시 보인다. */
+export function autoHiddenReason(a: Pick<Activity, "source" | "metadata">): "tentative" | "declined" | null {
+  if (a.source !== "calendar_event") return null;
+  const r = a.metadata?.response;
+  return (AUTO_HIDDEN_CALENDAR_RESPONSES as readonly unknown[]).includes(r) ? (r as "tentative" | "declined") : null;
+}
+
+/** 사용자가 숨겼거나 응답 상태로 자동 숨김인 활동 */
+export function isEffectivelyHidden(a: Pick<Activity, "source" | "metadata" | "isHidden">): boolean {
+  return a.isHidden || autoHiddenReason(a) !== null;
 }
 
 export interface Report {
@@ -151,6 +167,8 @@ export interface SprintDetail {
   sprint: Sprint;
   goals: GoalWithActivities[];
   unlinkedActivities: Activity[];
+  /** 숨긴 활동 (목표 연결 여부와 무관, 스프린트 기간 내 + 이 스프린트 목표에 연결된 것) */
+  hiddenActivities: Activity[];
   tasks: Task[];
 }
 

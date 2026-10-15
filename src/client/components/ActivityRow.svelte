@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Activity, Goal } from "$shared/types";
+  import { autoHiddenReason, isEffectivelyHidden, type Activity, type Goal } from "$shared/types";
   import { api } from "../lib/api";
   import { md, safeHref, sourceGroup, sourceLabel } from "../lib/format";
   import { isSubmitEnter } from "../lib/keys";
@@ -43,9 +43,11 @@
   const goalLabel = $derived(goals.find((g) => g.id === activity.goalId)?.title ?? null);
   // Board 의 Task 에 연결된 활동은 목표를 Task 에서 물려받으므로 읽기 전용으로 보여 준다.
   const taskLinked = $derived(activity.taskId !== null);
+  const autoHidden = $derived(autoHiddenReason(activity));
+  const hidden = $derived(isEffectivelyHidden(activity));
 </script>
 
-<li class="act" class:busy>
+<li class="act" class:busy class:hidden>
   <span class="date mono">{md(activity.occurredAt)}</span>
   <span class="chip src-{sourceGroup(activity)}">{sourceLabel(activity)}</span>
   <span class="title">
@@ -58,6 +60,14 @@
       <span class="note">— {activity.note}</span>
     {/if}
   </span>
+  {#if hidden}
+    {#if autoHidden}
+      <span class="chip auto" title="Google 캘린더에서 참석으로 바꾸면 다음 동기화 뒤 다시 표시됩니다">{autoHidden === "tentative" ? "미정" : "거절"}</span>
+    {/if}
+    {#if activity.isHidden}
+      <button class="btn sm" onclick={() => update({ isHidden: false })} disabled={busy}>다시 표시</button>
+    {/if}
+  {:else}
   <button
     class="star"
     class:on={activity.isHighlight}
@@ -71,12 +81,17 @@
     </svg>
   </button>
   <button class="btn sm" onclick={startNote} disabled={busy}>메모</button>
+  <button class="hide" title="숨기기 (리포트에서도 빠집니다)" aria-label="숨기기" onclick={() => update({ isHidden: true })} disabled={busy}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+      <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A9.8 9.8 0 0 1 12 5c5 0 8.5 4.5 9.5 7a13 13 0 0 1-2.6 3.8M6.3 6.3A13 13 0 0 0 2.5 12c1 2.5 4.5 7 9.5 7a9.6 9.6 0 0 0 4.2-1" />
+    </svg>
+  </button>
   {#if showGoal}
     {#if taskLinked}
-      <span class="chip goal" class:none={!goalLabel} title="Board 의 Task 목표를 따릅니다. 바꾸려면 Board 에서 수정하세요.">{goalLabel ?? "목표 없음"}</span>
+      <span class="chip goal goal-ctl" class:none={!goalLabel} title="Board 의 Task 목표를 따릅니다. 바꾸려면 Board 에서 수정하세요.">{goalLabel ?? "목표 없음"}</span>
     {:else if goals.length}
       <select
-        class="select goal-select"
+        class="select goal-select goal-ctl"
         class:linked={!!activity.goalId}
         value={activity.goalId ?? ""}
         onchange={(e) => update({ goalId: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
@@ -92,7 +107,8 @@
       <span class="chip goal">{goalLabel}</span>
     {/if}
   {/if}
-  {#if editingNote}
+  {/if}
+  {#if editingNote && !hidden}
     <div class="note-edit">
       <input class="input" bind:value={noteDraft} placeholder="리포트에 우선 반영되는 메모" onkeydown={(e) => isSubmitEnter(e) && saveNote()} />
       <button class="btn sm primary" onclick={saveNote} disabled={busy}>저장</button>
@@ -146,8 +162,44 @@
   .star:hover {
     opacity: 1;
   }
+  .hide {
+    border: none;
+    background: transparent;
+    padding: 4px;
+    cursor: pointer;
+    line-height: 0;
+    color: var(--text-3);
+    opacity: 0.6;
+  }
+  .hide:hover {
+    opacity: 1;
+    color: var(--text-2);
+  }
+  .chip.auto {
+    background: var(--warn-tint);
+    color: var(--warn);
+  }
+  .act.hidden .title,
+  .act.hidden .date,
+  .act.hidden .chip {
+    opacity: 0.55;
+  }
+  /* 목표 선택과 (Board 연결 활동의) 목표 칩을 같은 폭으로 둬서 앞의 버튼 위치가 행마다 같게 한다. */
+  .goal-ctl {
+    width: 160px;
+    flex: 0 0 160px;
+    min-height: 32px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chip.goal-ctl {
+    display: block;
+    padding: 6px 9px;
+    line-height: 18px;
+    border: 1px solid var(--accent-tint);
+  }
   .goal-select {
-    width: auto;
     min-height: 32px;
     padding: 4px 8px;
     font-size: 12px;
@@ -164,7 +216,9 @@
   }
   .chip.goal.none {
     color: var(--text-3);
+    background: transparent;
     border-style: dashed;
+    border-color: var(--border);
   }
   .note-edit {
     flex: 1 1 100%;

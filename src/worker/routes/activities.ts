@@ -1,17 +1,17 @@
-import { and, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, not } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { ACTIVITY_SOURCES } from "$shared/types";
 import { createDb, schema } from "../db";
 import { dayRangeToIso, isYmd } from "../lib/dates";
-import { toActivity } from "../lib/queries";
+import { toActivity, visibleActivity } from "../lib/queries";
 import type { AppContext } from "../lib/session";
 import { HttpError, httpUrl, idParam, parseBody } from "../lib/validate";
 import { randomToken } from "../lib/crypto";
 
 export const activityRoutes = new Hono<AppContext>();
 
-/** GET /api/activities?from=YYYY-MM-DD&to=YYYY-MM-DD&source=a,b&goalId=1&unlinked=1&limit=200 */
+/** GET /api/activities?from=YYYY-MM-DD&to=YYYY-MM-DD&source=a,b&goalId=1&unlinked=1&hidden=1|all&limit=200 (기본은 숨긴 활동과 미정·거절 일정 제외) */
 activityRoutes.get("/", async (c) => {
   const db = createDb(c.env.DB);
   const q = c.req.query();
@@ -24,6 +24,8 @@ activityRoutes.get("/", async (c) => {
   if (q.goalId) conds.push(eq(schema.activities.goalId, Number(q.goalId)));
   if (q.epicId) conds.push(eq(schema.activities.epicId, Number(q.epicId)));
   if (q.unlinked === "1") conds.push(isNull(schema.activities.goalId));
+  if (q.hidden === "1") conds.push(not(visibleActivity));
+  else if (q.hidden !== "all") conds.push(visibleActivity);
   const limit = Math.min(Number(q.limit) || 200, 1000);
   const rows = await db.query.activities.findMany({
     where: conds.length ? and(...conds) : undefined,
@@ -67,7 +69,7 @@ activityRoutes.post("/", async (c) => {
   return c.json(toActivity(row), 201);
 });
 
-/** 연결·하이라이트·메모 수정 */
+/** 연결·하이라이트·숨김·메모 수정 */
 activityRoutes.patch("/:id", async (c) => {
   const id = idParam(c);
   const body = await parseBody(
@@ -77,6 +79,7 @@ activityRoutes.patch("/:id", async (c) => {
       epicId: z.number().int().positive().nullable().optional(),
       taskId: z.number().int().positive().nullable().optional(),
       isHighlight: z.boolean().optional(),
+      isHidden: z.boolean().optional(),
       note: z.string().max(4000).nullable().optional(),
       title: z.string().trim().min(1).max(500).optional(),
     }),
