@@ -75,6 +75,15 @@ export function relTime(iso: string | null): string {
 }
 
 /** http(s) URL 만 링크로 쓴다. javascript: 같은 스킴은 null. */
+/** GitHub Issue/PR URL 을 종류와 짧은 표기(owner/repo#123)로 나눈다. */
+export function githubRef(url: string): { kind: "issue" | "pr" | null; ref: string } {
+  const m = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(issues|pull)\/(\d+)/.exec(url);
+  if (!m) return { kind: null, ref: url.replace(/^https:\/\/github\.com\//, "") };
+  return { kind: m[2] === "pull" ? "pr" : "issue", ref: `${m[1]}#${m[3]}` };
+}
+
+export const GITHUB_STATE_LABEL: Record<string, string> = { closed: "닫힘", merged: "머지됨" };
+
 export function safeHref(url: string | null | undefined): string | null {
   return url && /^https?:\/\//i.test(url) ? url : null;
 }
