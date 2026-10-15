@@ -22,7 +22,8 @@
   --gray-tint: #ecefee;
   --star: #c98a1b;
   --radius: 10px;
-  --font: "IBM Plex Sans KR", system-ui, -apple-system, sans-serif;
+  /* 한자는 일본어 자형으로 보이도록 JP 를 먼저 둔다. 한글은 JP 에 없으므로 KR 로 넘어간다. */
+  --font: "IBM Plex Sans JP", "IBM Plex Sans KR", system-ui, -apple-system, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
