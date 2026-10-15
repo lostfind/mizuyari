@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Activity, Goal } from "$shared/types";
+  import type { Activity, Goal, Task } from "$shared/types";
   import { api } from "../lib/api";
   import { md, safeHref, sourceGroup, sourceLabel } from "../lib/format";
   import { isSubmitEnter } from "../lib/keys";
@@ -7,11 +7,14 @@
   let {
     activity,
     goals = [],
+    tasks = [],
     showGoal = true,
     onchange,
   }: {
     activity: Activity;
     goals?: Pick<Goal, "id" | "title">[];
+    /** 활동이 가리키는 Task 를 찾기 위한 목록. task_id 가 있는 활동은 목표를 Task 에서 물려받는다. */
+    tasks?: Pick<Task, "id" | "title">[];
     showGoal?: boolean;
     onchange?: (a: Activity) => void;
   } = $props();
@@ -41,6 +44,8 @@
   }
 
   const goalLabel = $derived(goals.find((g) => g.id === activity.goalId)?.title ?? null);
+  const task = $derived(activity.taskId !== null ? (tasks.find((t) => t.id === activity.taskId) ?? null) : null);
+  const taskLinked = $derived(activity.taskId !== null);
 </script>
 
 <li class="act" class:busy>
@@ -70,7 +75,12 @@
   </button>
   <button class="btn sm" onclick={startNote} disabled={busy}>메모</button>
   {#if showGoal}
-    {#if goals.length}
+    {#if taskLinked}
+      <span class="chip task" title={task ? `Task「${task.title}」의 목표를 따릅니다. 바꾸려면 Board 에서 Task 의 목표를 수정하세요.` : "Task 의 목표를 따릅니다"}>
+        Task{task ? `: ${task.title}` : ""}
+      </span>
+      <span class="chip goal" class:none={!goalLabel}>{goalLabel ?? "목표 없음"}</span>
+    {:else if goals.length}
       <select
         class="select goal-select"
         class:linked={!!activity.goalId}
@@ -157,6 +167,16 @@
     border-color: var(--accent-tint);
     background: var(--accent-tint);
     color: var(--accent-strong);
+  }
+  .chip.task {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chip.goal.none {
+    color: var(--text-3);
+    border-style: dashed;
   }
   .note-edit {
     flex: 1 1 100%;

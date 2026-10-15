@@ -146,7 +146,7 @@
       if (filter === "all") return true;
       if (filter === "github") return a.source.startsWith("github");
       if (filter === "google") return a.source === "google_task" || a.source === "calendar_event";
-      if (filter === "task") return a.source === "task_status";
+      if (filter === "task") return a.taskId !== null || a.source === "task_status";
       return a.source === "manual";
     }),
   );
@@ -241,8 +241,8 @@
         {/each}
         {#if detail.sprint.status === "active"}
           <div class="add-goal">
-            <input class="input" bind:value={newTitle} placeholder="새 목표" onkeydown={(e) => isSubmitEnter(e) && addGoal()} />
-            <select class="select" bind:value={newEpicId} aria-label="Epic">
+            <input class="input title" bind:value={newTitle} placeholder="새 목표" onkeydown={(e) => isSubmitEnter(e) && addGoal()} />
+            <select class="select epic" bind:value={newEpicId} aria-label="Epic">
               <option value="">Epic 없음</option>
               {#each epics as e (e.id)}<option value={e.id}>{e.title}</option>{/each}
             </select>
@@ -269,7 +269,7 @@
         {:else}
           <ul class="list">
             {#each filtered as a (a.id)}
-              <ActivityRow activity={a} goals={goalOptions} onchange={onActivityChange} />
+              <ActivityRow activity={a} goals={goalOptions} tasks={detail.tasks} onchange={onActivityChange} />
             {/each}
           </ul>
         {/if}
@@ -341,15 +341,18 @@
   .sec-head.wrap {
     flex-wrap: wrap;
   }
+  /* 제목 입력은 한 줄을 다 쓰고, Epic 선택과 버튼은 아랫줄. Epic 제목이 길어도 입력란이 좁아지지 않는다. */
   .add-goal {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
   }
-  @media (max-width: 480px) {
-    .add-goal {
-      grid-template-columns: 1fr;
-    }
+  .add-goal .title {
+    grid-column: 1 / -1;
+  }
+  .add-goal .epic {
+    min-width: 0;
+    text-overflow: ellipsis;
   }
   .outside {
     padding: 12px 14px;
