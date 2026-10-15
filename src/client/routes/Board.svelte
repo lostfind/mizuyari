@@ -4,6 +4,7 @@
   import { TASK_STATUSES } from "$shared/types";
   import { api } from "../lib/api";
   import { safeHref, TASK_STATUS_LABEL, ymdShort } from "../lib/format";
+  import { isSubmitEnter } from "../lib/keys";
 
   let tasks = $state<Task[]>([]);
   let sprints = $state<Sprint[]>([]);
@@ -158,7 +159,7 @@
   {#if msg}<div class="card" style="padding:10px 14px">{msg}</div>{/if}
 
   <div class="card add">
-    <input class="input" bind:value={newTitle} placeholder="새 Task" onkeydown={(e) => e.key === "Enter" && addTask()} />
+    <input class="input" bind:value={newTitle} placeholder="새 Task" onkeydown={(e) => isSubmitEnter(e) && addTask()} />
     <select class="select" style="width:auto" bind:value={newStatus} aria-label="상태">
       {#each TASK_STATUSES as s (s)}<option value={s}>{TASK_STATUS_LABEL[s]}</option>{/each}
     </select>

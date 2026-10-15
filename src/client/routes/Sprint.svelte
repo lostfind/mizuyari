@@ -6,6 +6,7 @@
   import { api, ApiError } from "../lib/api";
   import { todayYmd, ymdShort } from "../lib/format";
   import { router } from "../lib/router.svelte";
+  import { isSubmitEnter } from "../lib/keys";
 
   let { id }: { id?: number } = $props();
 
@@ -201,7 +202,7 @@
 
     {#if manualOpen}
       <div class="card manual row">
-        <input class="input" style="flex:1" bind:value={manualTitle} placeholder="수집되지 않는 활동 (예: 온보딩 자료 검토)" onkeydown={(e) => e.key === "Enter" && addManual()} />
+        <input class="input" style="flex:1" bind:value={manualTitle} placeholder="수집되지 않는 활동 (예: 온보딩 자료 검토)" onkeydown={(e) => isSubmitEnter(e) && addManual()} />
         <button class="btn primary" onclick={addManual} disabled={!manualTitle.trim()}>추가</button>
       </div>
     {/if}
@@ -240,7 +241,7 @@
         {/each}
         {#if detail.sprint.status === "active"}
           <div class="add-goal">
-            <input class="input" bind:value={newTitle} placeholder="새 목표" onkeydown={(e) => e.key === "Enter" && addGoal()} />
+            <input class="input" bind:value={newTitle} placeholder="새 목표" onkeydown={(e) => isSubmitEnter(e) && addGoal()} />
             <select class="select" bind:value={newEpicId} aria-label="Epic">
               <option value="">Epic 없음</option>
               {#each epics as e (e.id)}<option value={e.id}>{e.title}</option>{/each}

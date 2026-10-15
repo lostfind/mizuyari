@@ -2,6 +2,7 @@
   import type { Activity, Goal } from "$shared/types";
   import { api } from "../lib/api";
   import { md, safeHref, sourceGroup, sourceLabel } from "../lib/format";
+  import { isSubmitEnter } from "../lib/keys";
 
   let {
     activity,
@@ -89,7 +90,7 @@
   {/if}
   {#if editingNote}
     <div class="note-edit">
-      <input class="input" bind:value={noteDraft} placeholder="리포트에 우선 반영되는 메모" onkeydown={(e) => e.key === "Enter" && saveNote()} />
+      <input class="input" bind:value={noteDraft} placeholder="리포트에 우선 반영되는 메모" onkeydown={(e) => isSubmitEnter(e) && saveNote()} />
       <button class="btn sm primary" onclick={saveNote} disabled={busy}>저장</button>
       <button class="btn sm" onclick={() => (editingNote = false)}>취소</button>
     </div>

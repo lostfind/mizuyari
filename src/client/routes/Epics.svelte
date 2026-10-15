@@ -4,6 +4,7 @@
   import { api } from "../lib/api";
   import { EPIC_STATUS_LABEL, GOAL_STATUS_LABEL, md, safeHref, ymdShort } from "../lib/format";
   import { router } from "../lib/router.svelte";
+  import { isSubmitEnter } from "../lib/keys";
 
   let { id }: { id?: number } = $props();
 
@@ -68,7 +69,7 @@
   <div class="cols">
     <aside class="card list">
       <div class="add">
-        <input class="input" bind:value={newTitle} placeholder="새 Epic" onkeydown={(e) => e.key === "Enter" && add()} />
+        <input class="input" bind:value={newTitle} placeholder="새 Epic" onkeydown={(e) => isSubmitEnter(e) && add()} />
         <button class="btn primary sm" onclick={add} disabled={!newTitle.trim()}>추가</button>
       </div>
       {#each ["active", "paused", "done"] as st (st)}
