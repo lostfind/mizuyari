@@ -61,8 +61,13 @@ sprintRoutes.patch("/:id", async (c) => {
   const id = idParam(c);
   const body = await parseBody(c, updateSchema);
   const db = createDb(c.env.DB);
+  const current = await db.query.sprints.findFirst({ where: eq(schema.sprints.id, id) });
+  if (!current) throw new HttpError(404, "sprint not found");
+  // 한쪽만 바꿔도 합친 기간이 올바른지 확인
+  if ((body.endDate ?? current.endDate) < (body.startDate ?? current.startDate)) {
+    throw new HttpError(400, "endDate must not be before startDate");
+  }
   const [row] = await db.update(schema.sprints).set(body).where(eq(schema.sprints.id, id)).returning();
-  if (!row) throw new HttpError(404, "sprint not found");
   return c.json(row);
 });
 

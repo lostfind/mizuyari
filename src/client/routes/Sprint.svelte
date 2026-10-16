@@ -33,6 +33,14 @@
   let carryIds = $state<number[]>([]);
   let closeCurrent = $state(true);
 
+  // 기간 수정
+  let editOpen = $state(false);
+  let editStart = $state("");
+  let editEnd = $state("");
+  let editMeeting = $state("");
+  let saving = $state(false);
+  let editError = $state("");
+
   // 수동 활동
   let manualTitle = $state("");
   let manualOpen = $state(false);
@@ -112,6 +120,46 @@
       error = e instanceof ApiError ? e.message : "스프린트를 만들지 못했습니다";
     } finally {
       creatingSprint = false;
+    }
+  }
+
+  function openEdit() {
+    if (!detail) return;
+    editStart = detail.sprint.startDate;
+    editEnd = detail.sprint.endDate;
+    editMeeting = detail.sprint.meetingDate ?? "";
+    editError = "";
+    editOpen = true;
+  }
+
+  // 종료일을 바꾸면 미팅일이 종료 다음 날이던 경우 함께 옮긴다
+  function onEndChange() {
+    if (!detail || !editEnd) return;
+    const oldNext = new Date(`${detail.sprint.endDate}T00:00:00Z`);
+    oldNext.setUTCDate(oldNext.getUTCDate() + 1);
+    if (editMeeting === oldNext.toISOString().slice(0, 10)) {
+      const d = new Date(`${editEnd}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + 1);
+      editMeeting = d.toISOString().slice(0, 10);
+    }
+  }
+
+  async function saveEdit() {
+    if (!detail || !editStart || !editEnd) return;
+    if (editEnd < editStart) {
+      editError = "종료일이 시작일보다 앞설 수 없습니다";
+      return;
+    }
+    saving = true;
+    editError = "";
+    try {
+      await api.sprints.update(detail.sprint.id, { startDate: editStart, endDate: editEnd, meetingDate: editMeeting || null });
+      editOpen = false;
+      await load();
+    } catch (e) {
+      editError = e instanceof ApiError ? e.message : "저장하지 못했습니다";
+    } finally {
+      saving = false;
     }
   }
 
@@ -202,11 +250,28 @@
         </div>
       </div>
       <div class="row">
+        <button class="btn" onclick={() => (editOpen ? (editOpen = false) : openEdit())}>기간 수정</button>
         <button class="btn" onclick={() => (manualOpen = !manualOpen)}>활동 직접 추가</button>
         <button class="btn" onclick={() => (nextOpen ? (nextOpen = false) : openNext())}>다음 스프린트</button>
         <a class="btn primary" href="/report?sprint={detail.sprint.id}" use:router.link>리포트 초안 만들기</a>
       </div>
     </div>
+
+    {#if editOpen}
+      <div class="card next-sprint">
+        <div class="row">
+          <label class="row" style="gap:6px">시작일 <input type="date" class="input" bind:value={editStart} style="width:auto" /></label>
+          <label class="row" style="gap:6px">종료일 <input type="date" class="input" bind:value={editEnd} onchange={onEndChange} style="width:auto" /></label>
+          <label class="row" style="gap:6px">미팅일 <input type="date" class="input" bind:value={editMeeting} style="width:auto" /></label>
+        </div>
+        <span class="muted">기간을 바꾸면 수집된 활동과 리포트 범위가 새 기간 기준으로 다시 잡힙니다.</span>
+        {#if editError}<div class="error">{editError}</div>{/if}
+        <div class="row">
+          <button class="btn primary" onclick={saveEdit} disabled={saving || !editStart || !editEnd}>저장</button>
+          <button class="btn" onclick={() => (editOpen = false)}>취소</button>
+        </div>
+      </div>
+    {/if}
 
     {#if manualOpen}
       <div class="card manual row">
