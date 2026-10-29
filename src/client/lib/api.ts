@@ -85,7 +85,7 @@ export const api = {
     create: (b: { startDate: string; endDate?: string; meetingDate?: string | null }) => post<Sprint>("/api/sprints", b),
     update: (id: number, b: Partial<Pick<Sprint, "startDate" | "endDate" | "meetingDate" | "status">>) => patch<Sprint>(`/api/sprints/${id}`, b),
     close: (id: number) => post<Sprint>(`/api/sprints/${id}/close`),
-    next: (id: number, b: { startDate?: string; carryGoalIds: number[]; closeCurrent: boolean }) => post<Sprint>(`/api/sprints/${id}/next`, b),
+    next: (id: number, b: { startDate?: string; carryGoalIds: number[]; closeCurrent: boolean; carryTasks: boolean }) => post<Sprint>(`/api/sprints/${id}/next`, b),
   },
   goals: {
     create: (b: Partial<Goal> & { sprintId: number; title: string }) => post<Goal>("/api/goals", b),
@@ -110,7 +110,7 @@ export const api = {
     create: (b: Partial<Task> & { title: string }) => post<Task>("/api/tasks", b),
     update: (id: number, b: Partial<Task>) => patch<Task>(`/api/tasks/${id}`, b),
     remove: (id: number) => del<{ ok: true }>(`/api/tasks/${id}`),
-    importGithub: (sprintId?: number | null) => post<{ imported: number; total: number }>("/api/tasks/import-github", { sprintId: sprintId ?? null }),
+    importGithub: () => post<{ imported: number; promoted: number; total: number }>("/api/tasks/import-github"),
   },
   activities: {
     list: (q: { from?: string; to?: string; source?: string; goalId?: number; epicId?: number; unlinked?: boolean; limit?: number }) => {

@@ -2,14 +2,15 @@
 // 기본 수집 범위는 직전 성공 시각 - 1일 ~ 지금. 처음이면 최근 30일.
 
 import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import type { SyncProvider } from "$shared/types";
+import { DEFAULT_GITHUB_EXCLUDE_TITLES, type SyncProvider } from "$shared/types";
 import type { Db } from "../db";
 import { schema } from "../db";
 import type { Env } from "../env";
 import { getGoogleAccessToken } from "../auth/google";
 import { dayRangeToIso, todayInTz } from "../lib/dates";
+import { getCurrentSprint } from "../lib/queries";
 import { linkActivitiesToTasks } from "../lib/taskLink";
-import { collectGithub, fetchAssignedOpenIssues, fetchGithubStates } from "./github";
+import { collectGithub, fetchGithubStates, fetchOpenWorkItems } from "./github";
 import { collectGoogleCalendar, collectGoogleTasks, fetchOpenGoogleTodos } from "./google";
 import type { CollectWindow, CollectedActivity } from "./types";
 
@@ -179,11 +180,12 @@ export async function deleteReopenedTodoActivities(db: Db, openKeys: Set<string>
 
 /**
  * Task 에 연결된 GitHub Issue/PR 상태를 동기화하고, 닫히면 Task 를 done 으로 옮긴다.
+ * 스프린트가 없던 Task 는 현재 스프린트로 지정한다.
  * 완료 기록은 수집된 Issue closed / PR merged 활동이 대신하므로 task_status 활동은 만들지 않는다.
  */
 export async function syncTaskGithubStates(db: Db, env: Env): Promise<number> {
   const rows = await db
-    .select({ id: schema.tasks.id, githubUrl: schema.tasks.githubUrl, status: schema.tasks.status })
+    .select({ id: schema.tasks.id, githubUrl: schema.tasks.githubUrl, status: schema.tasks.status, sprintId: schema.tasks.sprintId })
     .from(schema.tasks)
     .where(and(isNotNull(schema.tasks.githubUrl), inArray(schema.tasks.status, ["backlog", "todo", "in_progress"])));
   if (rows.length === 0) return 0;
@@ -193,6 +195,8 @@ export async function syncTaskGithubStates(db: Db, env: Env): Promise<number> {
   );
   let changed = 0;
   const now = new Date().toISOString();
+  // Backlog 에서 바로 닫힌 Task 처럼 스프린트가 없는 완료 Task 는 완료된 시점의 스프린트에 넣는다.
+  const sprintId = (await getCurrentSprint(db, todayInTz(env.TIMEZONE)))?.id ?? null;
   for (const r of rows) {
     const s = states.get(r.githubUrl!);
     if (!s) continue;
@@ -201,7 +205,7 @@ export async function syncTaskGithubStates(db: Db, env: Env): Promise<number> {
       .update(schema.tasks)
       .set({
         githubState: s.state,
-        ...(closed ? { status: "done" as const } : {}),
+        ...(closed ? { status: "done" as const, sprintId: r.sprintId ?? sprintId } : {}),
         updatedAt: now,
       })
       .where(eq(schema.tasks.id, r.id));
@@ -210,38 +214,97 @@ export async function syncTaskGithubStates(db: Db, env: Env): Promise<number> {
   return changed;
 }
 
+/** 줄마다 하나인 정규식. 비어 있거나 잘못된 줄은 무시한다. 설정이 없으면 기본 패턴을 쓴다. */
+export function parseTitlePatterns(raw: string | null): RegExp[] {
+  const out: RegExp[] = [];
+  for (const line of (raw ?? DEFAULT_GITHUB_EXCLUDE_TITLES).split("\n")) {
+    const p = line.trim();
+    if (!p) continue;
+    try {
+      out.push(new RegExp(p));
+    } catch {
+      // 잘못된 패턴은 건너뛴다
+    }
+  }
+  return out;
+}
+
 /**
- * 나에게 할당된 Open Issue 를 Task(backlog) 로 가져온다. 같은 github_url 의 Task 가 있으면 건너뛴다.
- * 자동 동기화(`auto`)는 한 번 가져온 Issue 를 다시 만들지 않는다. 사용자가 Task 를 지웠다면 그 뜻을 따른다.
- * 가져온 URL 은 settings 에 남기고, 지금도 열려 있는 할당 Issue 만 남겨 크기를 제한한다.
+ * GitHub 의 진행 대상(할당 Open Issue/PR, 내가 연 Open PR)을 Board 에 반영한다.
+ * - 새 항목: 진행 중(열린 PR, 열린 PR 이 연결된 Issue)이면 현재 스프린트 + In Progress, 아니면 스프린트 없이 Backlog.
+ * - 기존 Task: 이번에 새로 진행 중이 된 항목만 Backlog/Todo → In Progress 로 올린다.
+ *   계속 진행 중인 항목을 매번 올리지 않으므로 사용자가 되돌린 배치는 유지된다.
+ * - 제목이 제외 패턴에 맞는 항목은 가져오지 않는다.
+ * 자동 동기화(`auto`)는 한 번 처리한 항목을 다시 만들지 않는다. 사용자가 Task 를 지웠다면 그 뜻을 따른다.
  */
-export async function importAssignedIssues(
+export async function importGithubWork(
   db: Db,
   token: string,
-  opts: { sprintId?: number | null; auto?: boolean } = {},
-): Promise<{ imported: number; total: number }> {
-  const issues = await fetchAssignedOpenIssues(token);
-  const existing = await db.query.tasks.findMany({ columns: { githubUrl: true } });
-  const have = new Set(existing.map((t) => t.githubUrl).filter(Boolean));
-  const seenRaw = await readSetting(db, SETTING_KEYS.githubImportedIssues);
-  const seen = new Set<string>(seenRaw ? (JSON.parse(seenRaw) as string[]) : []);
+  tz: string,
+  opts: { auto?: boolean } = {},
+): Promise<{ imported: number; promoted: number; total: number }> {
+  const excludes = parseTitlePatterns(await readSetting(db, SETTING_KEYS.githubExcludeTitles));
+  const items = (await fetchOpenWorkItems(token)).filter((i) => !excludes.some((re) => re.test(i.title)));
+  const existing = await db.query.tasks.findMany({ columns: { id: true, githubUrl: true, status: true } });
+  const byUrl = new Map(existing.filter((t) => t.githubUrl).map((t) => [t.githubUrl!, t]));
+  const seen = new Set(readJsonArray(await readSetting(db, SETTING_KEYS.githubImportedIssues)));
+  const wasInProgress = new Set(readJsonArray(await readSetting(db, SETTING_KEYS.githubInProgress)));
+  const sprintId = (await getCurrentSprint(db, todayInTz(tz)))?.id ?? null;
+  const now = new Date().toISOString();
+
+  // 내가 연 PR 이 이미 있는 Task(직접 연결한 Issue 등)를 닫는 PR 이면 PR 대신 그 Task 를 진행 중으로 본다.
+  const inProgressUrls = new Set<string>();
+  const targets = [];
+  for (const i of items) {
+    const closesTask = i.closes.filter((u) => byUrl.has(u));
+    if (!byUrl.has(i.url) && closesTask.length) {
+      closesTask.forEach((u) => inProgressUrls.add(u));
+      continue;
+    }
+    if (i.inProgress) inProgressUrls.add(i.url);
+    targets.push(i);
+  }
+
   let imported = 0;
-  for (const i of issues) {
-    if (have.has(i.url) || (opts.auto && seen.has(i.url))) continue;
+  for (const i of targets) {
+    if (byUrl.has(i.url) || (opts.auto && seen.has(i.url))) continue;
+    const inProgress = inProgressUrls.has(i.url);
     await db.insert(schema.tasks).values({
       // 제목은 GitHub 제목 그대로. repo#번호 는 Board 가 github_url 에서 만들어 보여 준다.
       title: i.title,
-      status: "backlog",
+      status: inProgress ? "in_progress" : "backlog",
       githubUrl: i.url,
       githubState: "open",
-      sprintId: opts.sprintId ?? null,
+      sprintId: inProgress ? sprintId : null,
     });
     imported++;
   }
-  // 지금 할당된 Issue 는 Task 가 있든(가져왔거나 직접 연결했거나) 방금 가져왔든 모두 처리된 것으로 본다.
-  await writeSetting(db, SETTING_KEYS.githubImportedIssues, JSON.stringify(issues.map((i) => i.url)));
+
+  let promoted = 0;
+  for (const url of inProgressUrls) {
+    const t = byUrl.get(url);
+    if (!t || wasInProgress.has(url) || (t.status !== "backlog" && t.status !== "todo")) continue;
+    await db
+      .update(schema.tasks)
+      .set({ status: "in_progress", sprintId, updatedAt: now })
+      .where(eq(schema.tasks.id, t.id));
+    promoted++;
+  }
+
+  // 지금 열려 있는 항목은 Task 가 있든(가져왔거나 직접 연결했거나) 방금 가져왔든 모두 처리된 것으로 본다.
+  await writeSetting(db, SETTING_KEYS.githubImportedIssues, JSON.stringify(items.map((i) => i.url)));
+  await writeSetting(db, SETTING_KEYS.githubInProgress, JSON.stringify([...inProgressUrls]));
   if (imported) await linkActivitiesToTasks(db);
-  return { imported, total: issues.length };
+  return { imported, promoted, total: items.length };
+}
+
+function readJsonArray(raw: string | null): string[] {
+  try {
+    const v: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -296,7 +359,7 @@ export async function runSync(db: Db, env: Env, opts: SyncOptions = {}): Promise
       const ghWin = needBackfill && win.from > thirtyDaysAgo ? { from: thirtyDaysAgo, to: win.to } : win;
       const result = await runOne(db, provider, ghWin, async () => {
         const items = await collectGithub(env.GITHUB_TOKEN, env.GITHUB_LOGIN, ghWin);
-        await importAssignedIssues(db, env.GITHUB_TOKEN, { auto: true });
+        await importGithubWork(db, env.GITHUB_TOKEN, env.TIMEZONE, { auto: true });
         await syncTaskGithubStates(db, env);
         return items;
       });
@@ -355,6 +418,10 @@ export const SETTING_KEYS = {
   calendarColorLabels: "calendar:color_labels",
   /** 자동 가져오기에서 이미 처리한 할당 Issue URL JSON 배열 */
   githubImportedIssues: "github:imported_issues",
+  /** 직전 동기화 때 진행 중이던 Issue/PR URL JSON 배열 (새로 진행 중이 된 것만 In Progress 로 올리기 위해) */
+  githubInProgress: "github:in_progress",
+  /** 가져오지 않을 Issue/PR 제목 정규식. 줄마다 하나 */
+  githubExcludeTitles: "github:exclude_titles",
 } as const;
 
 export { sql };

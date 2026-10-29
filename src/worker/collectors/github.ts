@@ -265,20 +265,67 @@ interface NodeState {
   merged?: boolean;
 }
 
-/** 본인에게 할당된 Open Issue 를 가져온다 (Board 로 가져오기용). */
-export async function fetchAssignedOpenIssues(
-  token: string,
-): Promise<Array<{ url: string; title: string; repo: string; number: number }>> {
-  const data = await gql<{
-    search: { nodes: Array<{ title: string; url: string; number: number; repository: { nameWithOwner: string } }> };
-  }>(
+export interface OpenWorkItem {
+  url: string;
+  title: string;
+  repo: string;
+  number: number;
+  /** 열린 PR 이거나, 열린 PR 이 연결된(closing reference) Issue */
+  inProgress: boolean;
+  /** PR 이 닫을 Issue URL (내가 연 PR 만) */
+  closes: string[];
+}
+
+interface SearchNode {
+  __typename?: "Issue" | "PullRequest";
+  title?: string;
+  url?: string;
+  number?: number;
+  repository?: { nameWithOwner: string };
+  closedByPullRequestsReferences?: { totalCount: number };
+  closingIssuesReferences?: { nodes: Array<{ url: string }> };
+}
+
+/**
+ * Board 로 가져올 진행 대상: 나에게 할당된 Open Issue/PR + 내가 연 Open PR.
+ * 내가 연 PR 이 할당 Issue 를 닫는 PR 이면 PR 은 따로 돌려주지 않는다 (Issue 쪽이 진행 중으로 잡힌다).
+ */
+export async function fetchOpenWorkItems(token: string): Promise<OpenWorkItem[]> {
+  const fields = `__typename title url number repository { nameWithOwner }`;
+  const data = await gql<{ assigned: { nodes: SearchNode[] }; authored: { nodes: SearchNode[] } }>(
     token,
-    `query { search(type: ISSUE, first: 50, query: "is:open assignee:@me") {
-      nodes { ... on Issue { title url number repository { nameWithOwner } } ... on PullRequest { title url number repository { nameWithOwner } } }
-    } }`,
+    `query {
+      assigned: search(type: ISSUE, first: 50, query: "is:open assignee:@me") {
+        nodes {
+          ... on Issue { ${fields} closedByPullRequestsReferences(first: 1, includeClosedPrs: false) { totalCount } }
+          ... on PullRequest { ${fields} }
+        }
+      }
+      authored: search(type: ISSUE, first: 50, query: "is:open is:pr author:@me") {
+        nodes { ... on PullRequest { ${fields} closingIssuesReferences(first: 10) { nodes { url } } } }
+      }
+    }`,
     {},
   );
-  return data.search.nodes
-    .filter((n) => n.url)
-    .map((n) => ({ url: n.url, title: n.title, repo: n.repository.nameWithOwner, number: n.number }));
+  const out = new Map<string, OpenWorkItem>();
+  const toItem = (n: SearchNode, inProgress: boolean, closes: string[] = []): OpenWorkItem => ({
+    url: n.url!,
+    title: n.title ?? "",
+    repo: n.repository?.nameWithOwner ?? "",
+    number: n.number ?? 0,
+    inProgress,
+    closes,
+  });
+  for (const n of data.assigned.nodes) {
+    if (!n.url) continue;
+    const inProgress = n.__typename === "PullRequest" || (n.closedByPullRequestsReferences?.totalCount ?? 0) > 0;
+    out.set(n.url, toItem(n, inProgress));
+  }
+  for (const n of data.authored.nodes) {
+    if (!n.url || out.has(n.url)) continue;
+    const closes = n.closingIssuesReferences?.nodes.map((x) => x.url) ?? [];
+    if (closes.some((u) => out.has(u))) continue;
+    out.set(n.url, toItem(n, true, closes));
+  }
+  return [...out.values()];
 }
