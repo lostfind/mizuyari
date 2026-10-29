@@ -9,7 +9,7 @@ import type { Env } from "../env";
 import { getGoogleAccessToken } from "../auth/google";
 import { dayRangeToIso, todayInTz } from "../lib/dates";
 import { linkActivitiesToTasks } from "../lib/taskLink";
-import { collectGithub, fetchGithubStates } from "./github";
+import { collectGithub, fetchAssignedOpenIssues, fetchGithubStates } from "./github";
 import { collectGoogleCalendar, collectGoogleTasks, fetchOpenGoogleTodos } from "./google";
 import type { CollectWindow, CollectedActivity } from "./types";
 
@@ -211,6 +211,40 @@ export async function syncTaskGithubStates(db: Db, env: Env): Promise<number> {
 }
 
 /**
+ * 나에게 할당된 Open Issue 를 Task(backlog) 로 가져온다. 같은 github_url 의 Task 가 있으면 건너뛴다.
+ * 자동 동기화(`auto`)는 한 번 가져온 Issue 를 다시 만들지 않는다. 사용자가 Task 를 지웠다면 그 뜻을 따른다.
+ * 가져온 URL 은 settings 에 남기고, 지금도 열려 있는 할당 Issue 만 남겨 크기를 제한한다.
+ */
+export async function importAssignedIssues(
+  db: Db,
+  token: string,
+  opts: { sprintId?: number | null; auto?: boolean } = {},
+): Promise<{ imported: number; total: number }> {
+  const issues = await fetchAssignedOpenIssues(token);
+  const existing = await db.query.tasks.findMany({ columns: { githubUrl: true } });
+  const have = new Set(existing.map((t) => t.githubUrl).filter(Boolean));
+  const seenRaw = await readSetting(db, SETTING_KEYS.githubImportedIssues);
+  const seen = new Set<string>(seenRaw ? (JSON.parse(seenRaw) as string[]) : []);
+  let imported = 0;
+  for (const i of issues) {
+    if (have.has(i.url) || (opts.auto && seen.has(i.url))) continue;
+    await db.insert(schema.tasks).values({
+      // 제목은 GitHub 제목 그대로. repo#번호 는 Board 가 github_url 에서 만들어 보여 준다.
+      title: i.title,
+      status: "backlog",
+      githubUrl: i.url,
+      githubState: "open",
+      sprintId: opts.sprintId ?? null,
+    });
+    imported++;
+  }
+  // 지금 할당된 Issue 는 Task 가 있든(가져왔거나 직접 연결했거나) 방금 가져왔든 모두 처리된 것으로 본다.
+  await writeSetting(db, SETTING_KEYS.githubImportedIssues, JSON.stringify(issues.map((i) => i.url)));
+  if (imported) await linkActivitiesToTasks(db);
+  return { imported, total: issues.length };
+}
+
+/**
  * 한 번만 도는 정리: 예전에는 GitHub 연결 Task 가 done 될 때도 task_status 활동을 만들어 Issue closed 와 겹쳤다.
  * 메모·하이라이트가 없는 중복 행을 지운다. 완료 여부는 settings 에 남긴다.
  */
@@ -262,6 +296,7 @@ export async function runSync(db: Db, env: Env, opts: SyncOptions = {}): Promise
       const ghWin = needBackfill && win.from > thirtyDaysAgo ? { from: thirtyDaysAgo, to: win.to } : win;
       const result = await runOne(db, provider, ghWin, async () => {
         const items = await collectGithub(env.GITHUB_TOKEN, env.GITHUB_LOGIN, ghWin);
+        await importAssignedIssues(db, env.GITHUB_TOKEN, { auto: true });
         await syncTaskGithubStates(db, env);
         return items;
       });
@@ -318,6 +353,8 @@ export const SETTING_KEYS = {
   calendarPalette: "calendar:palette",
   /** colorId → 사용자가 붙인 라벨 JSON */
   calendarColorLabels: "calendar:color_labels",
+  /** 자동 가져오기에서 이미 처리한 할당 Issue URL JSON 배열 */
+  githubImportedIssues: "github:imported_issues",
 } as const;
 
 export { sql };

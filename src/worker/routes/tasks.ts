@@ -2,8 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { TASK_PRIORITIES, TASK_STATUSES } from "$shared/types";
-import { fetchAssignedOpenIssues } from "../collectors/github";
-import { upsertActivities } from "../collectors/run";
+import { importAssignedIssues, upsertActivities } from "../collectors/run";
 import { createDb, schema } from "../db";
 import { isYmd } from "../lib/dates";
 import type { AppContext } from "../lib/session";
@@ -100,22 +99,5 @@ taskRoutes.post("/import-github", async (c) => {
   if (!c.env.GITHUB_TOKEN) throw new HttpError(400, "GITHUB_TOKEN not set");
   const body = await parseBody(c, z.object({ sprintId: z.number().int().positive().nullable().optional() }).default({}));
   const db = createDb(c.env.DB);
-  const issues = await fetchAssignedOpenIssues(c.env.GITHUB_TOKEN);
-  const existing = await db.query.tasks.findMany({ columns: { githubUrl: true } });
-  const have = new Set(existing.map((t) => t.githubUrl).filter(Boolean));
-  let imported = 0;
-  for (const i of issues) {
-    if (have.has(i.url)) continue;
-    await db.insert(schema.tasks).values({
-      // 제목은 GitHub 제목 그대로. repo#번호 는 Board 가 github_url 에서 만들어 보여 준다.
-      title: i.title,
-      status: "backlog",
-      githubUrl: i.url,
-      githubState: "open",
-      sprintId: body.sprintId ?? null,
-    });
-    imported++;
-  }
-  if (imported) await linkActivitiesToTasks(db);
-  return c.json({ imported, total: issues.length });
+  return c.json(await importAssignedIssues(db, c.env.GITHUB_TOKEN, { sprintId: body.sprintId }));
 });
