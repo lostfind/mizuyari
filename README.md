@@ -4,7 +4,7 @@ GitHub·Google Tasks·Calendar 활동을 자동으로 모아 2주 단위 컨디�
 
 - **Sprint**: 2주 목표(Goal)와 수집된 활동을 연결하고 메모·하이라이트를 남긴다
 - **Epics**: 스프린트를 넘어 이어지는 긴 목표. Goal 이 그 아래에 붙는다
-- **Board**: GitHub Project 를 대체하는 칸반. Issue/PR 이 닫히면 자동으로 Done
+- **Board**: GitHub Project 를 대체하는 칸반. Issue/PR 이 닫히면 자동으로 Done. 나에게 할당된 Open Issue 는 동기화 때 Backlog 로 자동으로 가져온다 (한 번 가져온 Issue 는 Task 를 지워도 다시 만들지 않음)
 - **Report**: 템플릿으로 리포트 초안 생성 → 편집 → 확정 (버전 이력 보관)
 - **Archive**: 10월 시작 회계연도 기준 분기·반기 성과 (1Q = 10–12월)
 - **Today**: 오늘 일정, 진행 중 Task, Google TODO (체크로 완료, 체크 해제로 완료 취소)
@@ -92,7 +92,7 @@ pnpm run deploy
 | --- | --- |
 | `GET /api/sprints/current`, `POST /api/sprints`, `POST /api/sprints/:id/next` | 스프린트 조회·생성·다음 스프린트(목표 이월) |
 | `GET/POST/PATCH/DELETE /api/goals`, `/api/epics`, `/api/tasks` | 목표·Epic·Task |
-| `POST /api/tasks/import-github` | 나에게 할당된 Open Issue 를 Task 로 |
+| `POST /api/tasks/import-github` | 나에게 할당된 Open Issue 를 Task 로 (동기화 때도 자동 실행) |
 | `GET/POST/PATCH /api/activities` | 활동 조회, 수동 추가, 목표 연결·메모·하이라이트 |
 | `POST /api/reports/sprint/:id/draft`, `POST /api/reports/period/FY2026-1Q/draft` | 리포트 초안 |
 | `PATCH /api/reports/:id`, `POST /api/reports/:id/finalize` | 편집·확정 |
