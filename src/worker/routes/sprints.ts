@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createDb, schema } from "../db";
@@ -80,7 +80,7 @@ sprintRoutes.post("/:id/close", async (c) => {
   return c.json(row);
 });
 
-/** 다음 스프린트 생성 + 선택한 Goal 을 같은 Epic 아래 새 Goal 로 복제 */
+/** 다음 스프린트 생성 + 선택한 Goal 을 같은 Epic 아래 새 Goal 로 복제 + 미완료 Task 이월 */
 sprintRoutes.post("/:id/next", async (c) => {
   const id = idParam(c);
   const body = await parseBody(
@@ -89,6 +89,7 @@ sprintRoutes.post("/:id/next", async (c) => {
       startDate: ymd.optional(),
       carryGoalIds: z.array(z.number().int().positive()).default([]),
       closeCurrent: z.boolean().default(true),
+      carryTasks: z.boolean().default(true),
     }),
   );
   const db = createDb(c.env.DB);
@@ -119,6 +120,13 @@ sprintRoutes.post("/:id/next", async (c) => {
         order: i,
       });
     }
+  }
+  // 끝내지 못한 Task(Todo·In Progress)는 새 스프린트로 옮긴다. Done 은 완료한 스프린트에 남긴다.
+  if (body.carryTasks) {
+    await db
+      .update(schema.tasks)
+      .set({ sprintId: next.id, updatedAt: new Date().toISOString() })
+      .where(and(eq(schema.tasks.sprintId, id), inArray(schema.tasks.status, ["todo", "in_progress"])));
   }
   if (body.closeCurrent) {
     await db.update(schema.sprints).set({ status: "closed" }).where(eq(schema.sprints.id, id));

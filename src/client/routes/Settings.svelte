@@ -7,6 +7,7 @@
   let status = $state<SyncStatus[]>([]);
   let settings = $state<Record<string, string>>({});
   let excludeKeywords = $state("");
+  let githubExcludeTitles = $state("");
   let colorLabels = $state<Record<string, string>>({});
   let config = $state<{ githubLogin: string | null; timezone: string; fiscalYearStartMonth: number; reportLang: string } | null>(null);
   let msg = $state("");
@@ -21,6 +22,7 @@
   async function load() {
     [status, settings, config] = await Promise.all([api.sync.status(), api.sync.settings(), api.config()]);
     excludeKeywords = settings["calendar:exclude_keywords"] ?? "";
+    githubExcludeTitles = settings["github:exclude_titles"] ?? "";
     colorLabels = parseJson(settings["calendar:color_labels"]);
   }
 
@@ -66,6 +68,32 @@
       busy = false;
     }
   }
+
+  async function saveGithubExcludes() {
+    busy = true;
+    try {
+      settings = await api.sync.saveSettings({ "github:exclude_titles": githubExcludeTitles.trim() });
+      msg = "저장했습니다";
+    } finally {
+      busy = false;
+    }
+  }
+
+  // 잘못된 정규식 줄 (서버는 이런 줄을 무시한다)
+  const invalidPatterns = $derived(
+    githubExcludeTitles
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => {
+        if (!l) return false;
+        try {
+          new RegExp(l);
+          return false;
+        } catch {
+          return true;
+        }
+      }),
+  );
 
   async function resync() {
     if (!from || !to) return;
@@ -136,6 +164,16 @@
       <span class="muted">–</span>
       <input type="date" class="input" style="width:auto" bind:value={to} />
       <button class="btn" onclick={resync} disabled={busy || !from || !to}>재수집</button>
+    </div>
+  </section>
+
+  <section class="card sec">
+    <h2>GitHub 가져오기 제외 제목</h2>
+    <p class="muted small">제목이 이 정규식에 맞는 Issue·PR은 Board로 가져오지 않습니다. 줄마다 하나씩 적습니다. (예: <code>{"^Release \\d{14}$"}</code> 는 <code>Release 20261026151701</code> 같은 릴리스 PR)</p>
+    <textarea class="textarea mono" rows="3" bind:value={githubExcludeTitles} placeholder={"^Release \\d{14}$"}></textarea>
+    {#if invalidPatterns.length}<div class="error small">잘못된 정규식은 무시됩니다: {invalidPatterns.join(", ")}</div>{/if}
+    <div class="row">
+      <button class="btn primary" onclick={saveGithubExcludes} disabled={busy}>저장</button>
     </div>
   </section>
 

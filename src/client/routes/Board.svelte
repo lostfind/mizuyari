@@ -52,11 +52,12 @@
     return () => window.removeEventListener("mz:synced", h);
   });
 
+  // Backlog 는 스프린트와 무관하게 모두 보이고, 스프린트 필터는 Todo 이후 칸에만 적용한다.
   const visible = $derived(
     tasks.filter((t) => {
-      if (sprintFilter === "all") return true;
+      if (t.status === "backlog" || sprintFilter === "all") return true;
       if (sprintFilter === "none") return t.sprintId === null;
-      return t.sprintId === sprintFilter || (t.status !== "done" && t.sprintId === null && false);
+      return t.sprintId === sprintFilter;
     }),
   );
 
@@ -66,7 +67,8 @@
 
   async function addTask() {
     if (!newTitle.trim()) return;
-    await api.tasks.create({ title: newTitle.trim(), status: newStatus, sprintId: currentSprintId });
+    // Backlog 는 스프린트 없이, 그 외는 보고 있는 스프린트(없으면 서버가 현재 스프린트)로 만든다.
+    await api.tasks.create({ title: newTitle.trim(), status: newStatus, sprintId: newStatus === "backlog" ? null : currentSprintId });
     newTitle = "";
     await load();
   }
@@ -81,8 +83,8 @@
     importing = true;
     msg = "";
     try {
-      const r = await api.tasks.importGithub(currentSprintId);
-      msg = `GitHub에서 ${r.imported}건 가져옴 (할당된 Issue ${r.total}건)`;
+      const r = await api.tasks.importGithub();
+      msg = `GitHub에서 ${r.imported}건 가져옴` + (r.promoted ? ` · ${r.promoted}건 In Progress로 이동` : "") + ` (대상 ${r.total}건)`;
       await load();
     } catch (e) {
       msg = e instanceof Error ? e.message : "가져오기 실패";
@@ -141,7 +143,7 @@
   <div class="page-head">
     <div class="stack" style="gap:4px">
       <h1>Board</h1>
-      <span class="muted">GitHub Issue·PR의 open/closed 상태는 자동으로 반영됩니다. 닫히면 Done으로 이동합니다.</span>
+      <span class="muted">Backlog는 스프린트와 무관하게 모두 보입니다. Todo로 옮기면 현재 스프린트가, Backlog로 되돌리면 스프린트 미지정이 됩니다. GitHub Issue·PR이 닫히면 Done으로 이동합니다.</span>
     </div>
     <div class="row">
       <label class="muted" for="sprint-f">스프린트</label>

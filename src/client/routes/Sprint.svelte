@@ -32,6 +32,9 @@
   let nextStart = $state("");
   let carryIds = $state<number[]>([]);
   let closeCurrent = $state(true);
+  let carryTasks = $state(true);
+  // 다음 스프린트로 옮길 미완료 Task (Todo·In Progress)
+  const openTaskCount = $derived(detail ? detail.tasks.filter((t) => t.status === "todo" || t.status === "in_progress").length : 0);
 
   // 기간 수정
   let editOpen = $state(false);
@@ -106,6 +109,7 @@
     // 끝내지 못한 목표는 기본으로 이월
     carryIds = detail.goals.filter((g) => g.status !== "achieved" && g.status !== "dropped").map((g) => g.id);
     closeCurrent = detail.sprint.status === "active";
+    carryTasks = true;
     nextOpen = true;
   }
 
@@ -113,7 +117,7 @@
     if (!detail || !nextStart) return;
     creatingSprint = true;
     try {
-      const s = await api.sprints.next(detail.sprint.id, { startDate: nextStart, carryGoalIds: carryIds, closeCurrent });
+      const s = await api.sprints.next(detail.sprint.id, { startDate: nextStart, carryGoalIds: carryIds, closeCurrent, carryTasks });
       nextOpen = false;
       router.go({ name: "sprint", id: s.id });
     } catch (e) {
@@ -293,6 +297,9 @@
               <label class="row" style="gap:6px"><input type="checkbox" value={g.id} bind:group={carryIds} />{g.title}</label>
             {/each}
           </fieldset>
+        {/if}
+        {#if openTaskCount}
+          <label class="row" style="gap:6px"><input type="checkbox" bind:checked={carryTasks} />끝내지 못한 Task {openTaskCount}건(Todo·In Progress)을 다음 스프린트로 옮기기</label>
         {/if}
         {#if detail.sprint.status === "active"}
           <label class="row" style="gap:6px"><input type="checkbox" bind:checked={closeCurrent} />현재 스프린트 종료</label>
