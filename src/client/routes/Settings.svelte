@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { DEFAULT_GITHUB_EXCLUDE_TITLES } from "$shared/types";
   import { api, type SyncStatus } from "../lib/api";
   import { relTime, todayYmd } from "../lib/format";
   import { session } from "../lib/session.svelte";
@@ -23,7 +22,7 @@
   async function load() {
     [status, settings, config] = await Promise.all([api.sync.status(), api.sync.settings(), api.config()]);
     excludeKeywords = settings["calendar:exclude_keywords"] ?? "";
-    githubExcludeTitles = settings["github:exclude_titles"] ?? DEFAULT_GITHUB_EXCLUDE_TITLES;
+    githubExcludeTitles = settings["github:exclude_titles"] ?? "";
     colorLabels = parseJson(settings["calendar:color_labels"]);
   }
 
@@ -170,8 +169,8 @@
 
   <section class="card sec">
     <h2>GitHub 가져오기 제외 제목</h2>
-    <p class="muted small">제목이 이 정규식에 맞는 Issue·PR은 Board로 가져오지 않습니다. 줄마다 하나씩 적습니다. (기본: 릴리스 PR <code>Release 20261026151701</code>)</p>
-    <textarea class="textarea mono" rows="3" bind:value={githubExcludeTitles} placeholder={DEFAULT_GITHUB_EXCLUDE_TITLES}></textarea>
+    <p class="muted small">제목이 이 정규식에 맞는 Issue·PR은 Board로 가져오지 않습니다. 줄마다 하나씩 적습니다. (예: <code>{"^Release \\d{14}$"}</code> 는 <code>Release 20261026151701</code> 같은 릴리스 PR)</p>
+    <textarea class="textarea mono" rows="3" bind:value={githubExcludeTitles} placeholder={"^Release \\d{14}$"}></textarea>
     {#if invalidPatterns.length}<div class="error small">잘못된 정규식은 무시됩니다: {invalidPatterns.join(", ")}</div>{/if}
     <div class="row">
       <button class="btn primary" onclick={saveGithubExcludes} disabled={busy}>저장</button>

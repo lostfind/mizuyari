@@ -2,7 +2,7 @@
 // 기본 수집 범위는 직전 성공 시각 - 1일 ~ 지금. 처음이면 최근 30일.
 
 import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { DEFAULT_GITHUB_EXCLUDE_TITLES, type SyncProvider } from "$shared/types";
+import type { SyncProvider } from "$shared/types";
 import type { Db } from "../db";
 import { schema } from "../db";
 import type { Env } from "../env";
@@ -214,10 +214,10 @@ export async function syncTaskGithubStates(db: Db, env: Env): Promise<number> {
   return changed;
 }
 
-/** 줄마다 하나인 정규식. 비어 있거나 잘못된 줄은 무시한다. 설정이 없으면 기본 패턴을 쓴다. */
+/** 줄마다 하나인 정규식. 비어 있거나 잘못된 줄은 무시한다. 설정이 없으면 아무것도 제외하지 않는다. */
 export function parseTitlePatterns(raw: string | null): RegExp[] {
   const out: RegExp[] = [];
-  for (const line of (raw ?? DEFAULT_GITHUB_EXCLUDE_TITLES).split("\n")) {
+  for (const line of (raw ?? "").split("\n")) {
     const p = line.trim();
     if (!p) continue;
     try {

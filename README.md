@@ -6,7 +6,7 @@ GitHub·Google Tasks·Calendar 활동을 자동으로 모아 2주 단위 컨디�
 - **Epics**: 스프린트를 넘어 이어지는 긴 목표. Goal 이 그 아래에 붙는다
 - **Board**: GitHub Project 를 대체하는 칸반. Backlog 는 스프린트와 무관하게 모두 보이고, Todo 부터가 현재 스프린트 대상이다 (Todo 로 옮기면 현재 스프린트 지정, Backlog 로 되돌리면 해제). 스프린트를 넘길 때 남은 Todo·In Progress 는 다음 스프린트로 이월된다
   - 동기화 때 나에게 할당된 Open Issue/PR 과 내가 연 Open PR 을 가져온다. 진행 중(열린 PR, 열린 PR 이 연결된 Issue)이면 현재 스프린트의 In Progress, 아니면 스프린트 없이 Backlog. Issue/PR 이 닫히면 자동으로 Done
-  - 한 번 가져온 항목은 Task 를 지워도 다시 만들지 않는다. 제목이 제외 패턴(설정, 기본 `^Release \d{14}$`)에 맞는 항목은 가져오지 않는다
+  - 한 번 가져온 항목은 Task 를 지워도 다시 만들지 않는다. 제목이 제외 패턴(Settings 에서 정규식으로 지정)에 맞는 항목은 가져오지 않는다
 - **Report**: 템플릿으로 리포트 초안 생성 → 편집 → 확정 (버전 이력 보관)
 - **Archive**: 10월 시작 회계연도 기준 분기·반기 성과 (1Q = 10–12월)
 - **Today**: 오늘 일정, 진행 중 Task, Google TODO (체크로 완료, 체크 해제로 완료 취소)

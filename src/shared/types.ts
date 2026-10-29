@@ -29,9 +29,6 @@ export type ActivitySource = (typeof ACTIVITY_SOURCES)[number];
 export const REPORT_KINDS = ["sprint", "quarter", "half_year"] as const;
 export type ReportKind = (typeof REPORT_KINDS)[number];
 
-/** GitHub 가져오기 기본 제외 패턴 (줄마다 정규식): 할당은 되어 있지만 직접 관련이 없는 릴리스 PR (`Release 20261026151701`) */
-export const DEFAULT_GITHUB_EXCLUDE_TITLES = "^Release \\d{14}$";
-
 export const SYNC_PROVIDERS = ["github", "google_tasks", "google_calendar"] as const;
 export type SyncProvider = (typeof SYNC_PROVIDERS)[number];
 
